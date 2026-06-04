@@ -1,7 +1,7 @@
 // シンプルなService Worker。
 // アプリの殻（HTML/CSS/JS）はキャッシュしてオフラインでも開けるようにする。
 // 到着時間などの /api/ はリアルタイムが命なので必ずネットから取る。
-const CACHE = 'sgbus-v6';
+const CACHE = 'sgbus-v7';
 const SHELL = [
   './',
   './index.html',
@@ -9,6 +9,8 @@ const SHELL = [
   './app.js',
   './manifest.webmanifest',
   './icons/icon.svg',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
 ];
 
 self.addEventListener('install', (e) => {
