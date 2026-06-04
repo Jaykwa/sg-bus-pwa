@@ -1,0 +1,143 @@
+:root {
+  --green: #0b6b3a;
+  --green-dark: #084f2b;
+  --bg: #f3f5f4;
+  --card: #ffffff;
+  --ink: #1c1f1d;
+  --muted: #6b7770;
+  --line: #e3e7e5;
+  --eta-soon: #d33;
+  --eta-mid: #e08600;
+  --eta-far: #0b6b3a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+.topbar {
+  background: var(--green);
+  color: #fff;
+  padding: env(safe-area-inset-top) 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: calc(52px + env(safe-area-inset-top));
+}
+.topbar h1 { font-size: 18px; margin: 0; }
+.badge { font-size: 11px; background: rgba(255,255,255,.2); padding: 2px 8px; border-radius: 10px; }
+main { max-width: 720px; margin: 0 auto; padding: 12px; }
+
+.search { display: flex; gap: 8px; margin-bottom: 10px; }
+.search input {
+  flex: 1; padding: 12px 14px; border: 1px solid var(--line);
+  border-radius: 12px; font-size: 15px; background: var(--card);
+}
+.search button {
+  border: none; background: var(--green); color: #fff;
+  border-radius: 12px; padding: 0 14px; font-size: 14px; font-weight: 600;
+}
+
+.tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.tabs button {
+  flex: 1; padding: 9px; border: 1px solid var(--line); background: var(--card);
+  border-radius: 10px; font-size: 14px; color: var(--muted);
+}
+.tabs button.active { background: var(--green); color: #fff; border-color: var(--green); }
+
+.view { display: none; }
+.view.active { display: block; }
+.hint { color: var(--muted); text-align: center; padding: 28px 12px; font-size: 14px; }
+
+.stop-card, .arr-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px 14px; margin-bottom: 10px;
+}
+.stop-card { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+.stop-card .name { font-weight: 600; }
+.stop-card .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.stop-card .right { text-align: right; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.fav-star { font-size: 20px; background: none; border: none; cursor: pointer; }
+
+#map { height: 70vh; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+.map-go {
+  margin-top: 8px; border: none; background: var(--green); color: #fff;
+  border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.leaflet-popup-content { font-size: 13px; }
+
+/* モーダル */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; z-index: 1000; }
+.modal.hidden { display: none; }
+.modal-card {
+  background: var(--bg); width: 100%; max-width: 720px; margin: 0 auto;
+  border-radius: 18px 18px 0 0; padding: 16px; max-height: 82vh; overflow-y: auto;
+}
+.modal-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.modal-actions button { font-size: 20px; background: none; border: none; margin-left: 6px; cursor: pointer; }
+.muted { color: var(--muted); font-size: 12px; }
+
+.arr-card { display: flex; align-items: center; gap: 12px; }
+.svc-no {
+  min-width: 56px; text-align: center; font-weight: 800; font-size: 18px;
+  background: var(--green); color: #fff; border-radius: 10px; padding: 8px 6px;
+}
+.etas { display: flex; gap: 10px; flex: 1; }
+.eta { text-align: center; flex: 1; }
+.eta .min { font-size: 22px; font-weight: 800; line-height: 1.1; }
+.eta .min .unit { font-size: 11px; font-weight: 600; margin-left: 1px; }
+.eta .min.soon { color: var(--eta-soon); }
+.eta .min.mid  { color: var(--eta-mid); }
+.eta .min.far  { color: var(--eta-far); }
+.ic-row { display: flex; gap: 4px; justify-content: center; margin-top: 3px; }
+.ic { display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center; color: var(--muted); }
+.ic svg { width: 16px; height: 16px; display: block; }
+.ic-emoji { font-size: 14px; line-height: 1; }
+.load-badge {
+  display: inline-block; margin-top: 3px; font-size: 10px; font-weight: 700;
+  padding: 1px 6px; border-radius: 999px; white-space: nowrap; line-height: 1.5;
+}
+.load-low  { background: #e3f5e9; color: #0b6b3a; }
+.load-mid  { background: #fdf0d9; color: #9a6200; }
+.load-high { background: #fde3e3; color: #b32020; }
+.load-na   { background: #eee; color: #999; }
+.spin { text-align: center; padding: 24px; color: var(--muted); }
+
+/* 路線ごとのお気に入り★（到着カード内） */
+.svc-star { font-size: 22px; background: none; border: none; cursor: pointer; padding: 0 2px; color: var(--eta-mid); }
+
+/* お気に入りタブ */
+.fav-h { font-size: 13px; color: var(--muted); margin: 14px 2px 8px; font-weight: 700; }
+.fav-h:first-child { margin-top: 0; }
+.svc-pill {
+  display: inline-block; background: var(--green); color: #fff; font-weight: 800;
+  border-radius: 8px; padding: 1px 8px; margin-right: 6px; font-size: 14px;
+}
+/* バス停ごとにまとめたカード */
+.fav-stop { display: block; }
+.fav-stop-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.fav-stop-text { flex: 1; cursor: pointer; }
+.fav-stop-head .name { font-weight: 600; }
+.fav-stop-head .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+/* 並び替えボタン */
+.reorder { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.rbtn {
+  width: 30px; height: 26px; border: 1px solid var(--line); background: #fff;
+  border-radius: 8px; font-size: 12px; color: var(--green); cursor: pointer; line-height: 1;
+}
+.rbtn:disabled { color: #ccc; background: #f6f7f7; cursor: default; }
+.rbtn:active:not(:disabled) { background: var(--green); color: #fff; }
+.fav-svc-lines { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }
+.fav-svc-line {
+  display: flex; align-items: center; gap: 8px; padding: 4px 0;
+}
+.fav-svc-line + .fav-svc-line { border-top: 1px dashed var(--line); }
+.fav-svc-line .right { font-size: 13px; }
+.fav-svc-line .right .min { font-weight: 800; margin-left: 6px; }
+.fav-svc-line .right .min.soon { color: var(--eta-soon); }
+.fav-svc-line .right .min.mid  { color: var(--eta-mid); }
+.fav-svc-line .right .min.far  { color: var(--eta-far); }

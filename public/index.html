@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b6b3a" />
+  <title>SG Bus｜シンガポールのバス到着時間</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon.svg" />
+  <!-- Leaflet（無料地図） -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>🚌 SG Bus</h1>
+    <span id="modeBadge" class="badge"></span>
+  </header>
+
+  <main>
+    <!-- 検索 -->
+    <section class="search">
+      <input id="searchInput" type="search" placeholder="バス停コード・名前・道路名で検索 (例: 09022, Orchard)" autocomplete="off" />
+      <button id="nearbyBtn" title="現在地から近いバス停">📍 近く</button>
+    </section>
+
+    <!-- タブ -->
+    <nav class="tabs">
+      <button data-tab="list" class="active">一覧</button>
+      <button data-tab="map">地図</button>
+      <button data-tab="fav">★ お気に入り</button>
+    </nav>
+
+    <!-- 一覧（検索結果 or お気に入りの到着情報） -->
+    <section id="view-list" class="view active">
+      <p id="listHint" class="hint">バス停を検索するか、📍近く を押してや</p>
+      <div id="results"></div>
+    </section>
+
+    <!-- 地図 -->
+    <section id="view-map" class="view">
+      <div id="map"></div>
+    </section>
+
+    <!-- お気に入り -->
+    <section id="view-fav" class="view">
+      <p id="favHint" class="hint">お気に入りはまだ無いで。<br>到着画面で各バスの ☆ を押すと「この停留所のこの番号」だけ登録できるで</p>
+      <div id="favList"></div>
+    </section>
+  </main>
+
+  <!-- バス停の到着詳細モーダル -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <strong id="mTitle"></strong>
+          <div id="mSub" class="muted"></div>
+        </div>
+        <div class="modal-actions">
+          <button id="mFav" title="お気に入り">☆</button>
+          <button id="mClose">✕</button>
+        </div>
+      </div>
+      <div id="mBody" class="arrivals"></div>
+      <div class="modal-foot muted" id="mFoot"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+node_modules/
+.env
+busstops.cache.json
+*.log
+# Bubblewrap が作るもの
+*.apk
+*.aab
+*.keystore
+android.keystore
+.bubblewrap/
+twa-manifest.json.bak

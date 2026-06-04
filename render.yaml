@@ -1,0 +1,13 @@
+# Render Blueprint：これがあると Render が自動で設定を読む。
+# ダッシュボードで「New → Blueprint」→ このリポジトリを選ぶだけ。
+services:
+  - type: web
+    name: sg-bus-pwa
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/status
+    envVars:
+      - key: LTA_ACCOUNT_KEY
+        sync: false   # ← 鍵はダッシュボードで手入力（コードに載せへん）

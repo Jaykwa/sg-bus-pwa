@@ -1,0 +1,13 @@
+{
+  "name": "sg-bus-pwa",
+  "version": "0.1.0",
+  "description": "シンガポールのバス到着予想時間を表示するPWA（LTA DataMall利用）",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
