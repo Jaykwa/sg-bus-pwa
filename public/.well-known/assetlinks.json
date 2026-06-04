@@ -3,7 +3,7 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "us.originally.sgbus",
+      "package_name": "com.ja.sgbus",
       "sha256_cert_fingerprints": [
         "ここに Bubblewrap が出力した署名フィンガープリント(SHA256)を貼る"
       ]

@@ -48,7 +48,7 @@ npm install -g @bubblewrap/cli
 # プロジェクト初期化（公開manifestのURLを指定）
 bubblewrap init --manifest https://＜RenderのURL＞/manifest.webmanifest
 #  → JDK と Android SDK を自動でダウンロードするか聞かれる → Yes
-#  → アプリ名・パッケージ名(us.originally.sgbus 等)・署名キー情報を対話で入力
+#  → アプリ名・パッケージ名(com.ja.sgbus)・署名キー情報を対話で入力
 
 # ビルド
 bubblewrap build
