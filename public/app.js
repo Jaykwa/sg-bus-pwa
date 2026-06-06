@@ -93,6 +93,8 @@ function switchTab(tab) {
   );
   document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
   $(`#view-${tab}`).classList.add('active');
+  // 検索バーは「一覧」タブのときだけ表示（地図・お気に入りでは不要）
+  $('.search').style.display = tab === 'list' ? 'flex' : 'none';
   if (tab === 'map') setupMap();
   if (tab === 'fav') { renderFavorites(); startFavRefresh(); }
   else stopFavRefresh(); // 他タブに移ったら30秒更新は止める

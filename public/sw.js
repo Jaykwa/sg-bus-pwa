@@ -1,7 +1,7 @@
 // シンプルなService Worker。
 // アプリの殻（HTML/CSS/JS）はキャッシュしてオフラインでも開けるようにする。
 // 到着時間などの /api/ はリアルタイムが命なので必ずネットから取る。
-const CACHE = 'sgbus-v7';
+const CACHE = 'sgbus-v8';
 const SHELL = [
   './',
   './index.html',
