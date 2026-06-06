@@ -101,9 +101,53 @@ function switchTab(tab) {
   else stopFavRefresh(); // 他タブに移ったら30秒更新は止める
 }
 
+// ── 検索クエリの正規化＆日本語→英語変換 ──
+// 全角英数字・全角スペースを半角へ
+function normalizeQuery(q) {
+  return q
+    .replace(/[！-～]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .replace(/　/g, ' ')
+    .trim();
+}
+
+// シンガポールの主要地名・MRT・ランドマークの日本語→英語辞書
+const JP_PLACE = {
+  'オーチャード': 'Orchard', 'サマセット': 'Somerset', 'ドビーゴート': 'Dhoby Ghaut',
+  'シティホール': 'City Hall', 'ラッフルズ': 'Raffles', 'マリーナベイ': 'Marina Bay',
+  'マリーナ': 'Marina', 'ベイフロント': 'Bayfront', 'ブギス': 'Bugis',
+  'チャイナタウン': 'Chinatown', '中華街': 'Chinatown', 'クラークキー': 'Clarke Quay',
+  'リトルインディア': 'Little India', 'ファーラーパーク': 'Farrer Park', 'ノベナ': 'Novena',
+  'ニュートン': 'Newton', 'チャンギ空港': 'Changi Airport', 'チャンギ': 'Changi',
+  '空港': 'Airport', 'セントーサ': 'Sentosa', 'ハーバーフロント': 'HarbourFront',
+  'ジュロンイースト': 'Jurong East', 'ジュロン': 'Jurong', 'ブーンレイ': 'Boon Lay',
+  'クレメンティ': 'Clementi', 'ブオナビスタ': 'Buona Vista', 'ウッドランズ': 'Woodlands',
+  'アドミラルティ': 'Admiralty', 'センバワン': 'Sembawang', 'イーシュン': 'Yishun',
+  'タンピネス': 'Tampines', 'ベドック': 'Bedok', 'パシリス': 'Pasir Ris',
+  'タナメラ': 'Tanah Merah', 'ユーノス': 'Eunos', 'パヤレバ': 'Paya Lebar',
+  'アンモキオ': 'Ang Mo Kio', 'ビシャン': 'Bishan', 'トアパヨ': 'Toa Payoh',
+  'セラングーン': 'Serangoon', 'ホウガン': 'Hougang', 'センカン': 'Sengkang',
+  'プンゴル': 'Punggol', 'カトン': 'Katong', 'ゲイラン': 'Geylang',
+  'ブキティマ': 'Bukit Timah', 'ブキバトック': 'Bukit Batok', 'ブキパンジャン': 'Bukit Panjang',
+  'チョアチューカン': 'Choa Chu Kang', 'カラン': 'Kallang', 'ラベンダー': 'Lavender',
+  '病院': 'Hospital', '大学': 'University', '公園': 'Park', '動物園': 'Zoo',
+  'マウントエリザベス': 'Mount Elizabeth', 'タンジョンパガー': 'Tanjong Pagar',
+};
+
+// 日本語が含まれていれば辞書で英語に置換（最長一致優先）
+function jpToEn(q) {
+  if (!/[぀-ヿ㐀-鿿]/.test(q)) return q; // 日本語なし→そのまま
+  let out = q;
+  for (const k of Object.keys(JP_PLACE).sort((a, b) => b.length - a.length)) {
+    if (out.includes(k)) out = out.split(k).join(' ' + JP_PLACE[k] + ' ');
+  }
+  // 変換し切れなかった日本語は除去して整える
+  out = out.replace(/[぀-ヿ㐀-鿿]/g, ' ').replace(/\s+/g, ' ').trim();
+  return out || q;
+}
+
 // ── 検索 ──
 async function onSearch(e) {
-  const q = e.target.value.trim();
+  const q = jpToEn(normalizeQuery(e.target.value));
   if (q.length < 2) { $('#results').innerHTML = ''; $('#listHint').style.display = 'block'; return; }
   $('#listHint').style.display = 'none';
   const stops = await api('/api/search?q=' + encodeURIComponent(q));
