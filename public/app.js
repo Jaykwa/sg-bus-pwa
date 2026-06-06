@@ -53,6 +53,7 @@ async function init() {
 
   $('#searchInput').addEventListener('input', debounce(onSearch, 300));
   $('#nearbyBtn').addEventListener('click', onNearby);
+  $('#locateBtn').addEventListener('click', locateAndPlot); // 地図：現在地に戻る
   document.querySelectorAll('.tabs button').forEach((b) =>
     b.addEventListener('click', () => switchTab(b.dataset.tab))
   );
