@@ -18,18 +18,18 @@
   </header>
 
   <main>
-    <!-- 検索 -->
-    <section class="search">
-      <input id="searchInput" type="search" placeholder="バス停コード・名前・道路名で検索 (例: 09022, Orchard)" autocomplete="off" />
-      <button id="nearbyBtn" title="現在地から近いバス停">📍 近く</button>
-    </section>
-
     <!-- タブ -->
     <nav class="tabs">
       <button data-tab="list" class="active">一覧</button>
       <button data-tab="map">地図</button>
       <button data-tab="fav">★ お気に入り</button>
     </nav>
+
+    <!-- 検索（一覧タブのときだけ表示。タブ行の下） -->
+    <section class="search">
+      <input id="searchInput" type="search" placeholder="バス停コード・名前・道路名で検索 (例: 09022, Orchard)" autocomplete="off" />
+      <button id="nearbyBtn" title="現在地から近いバス停">📍 近く</button>
+    </section>
 
     <!-- 一覧（検索結果 or お気に入りの到着情報） -->
     <section id="view-list" class="view active">
