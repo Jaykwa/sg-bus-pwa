@@ -131,6 +131,21 @@ const JP_PLACE = {
   'チョアチューカン': 'Choa Chu Kang', 'カラン': 'Kallang', 'ラベンダー': 'Lavender',
   '病院': 'Hospital', '大学': 'University', '公園': 'Park', '動物園': 'Zoo',
   'マウントエリザベス': 'Mount Elizabeth', 'タンジョンパガー': 'Tanjong Pagar',
+  // ── 観光ガイド掲載スポット（バス停データでヒット確認済み）──
+  'マリーナベイサンズ': 'Marina Bay Sands', 'ガーデンズバイザベイ': 'Gardens by the Bay',
+  'マーライオン': 'Fullerton', 'シンガポールフライヤー': 'Flyer', 'エスプラネード': 'Esplanade',
+  'ボートキー': 'Boat', 'ハジレーン': 'Haji', 'アラブストリート': 'Sultan',
+  'カンポングラム': 'Sultan', 'サルタンモスク': 'Sultan', 'チャイムス': 'Chijmes',
+  'ボタニックガーデン': 'Botanic', '植物園': 'Botanic', 'ナイトサファリ': 'Mandai',
+  'リバーサファリ': 'Mandai', 'マンダイ': 'Mandai', 'バードパーク': 'Bird Paradise',
+  'サイエンスセンター': 'Science Ctr', 'ユニバーサルスタジオ': 'Resorts World',
+  'リゾートワールド': 'Resorts World', 'ビボシティ': 'VivoCity', 'マウントフェーバー': 'Faber',
+  'ティオンバル': 'Tiong Bahru', 'ホランドビレッジ': 'Holland', 'デンプシー': 'Dempsey',
+  'チャンギビレッジ': 'Changi Village', 'サンテックシティ': 'Suntec', 'ラッフルズプレイス': 'Raffles Pl',
+  'フォートカニング': 'Fort Canning', '国立博物館': 'Museum', '博物館': 'Museum',
+  'ナショナルスタジアム': 'Stadium', 'スタジアム': 'Stadium', 'イーストコースト': 'East Coast',
+  'スリマリアマン': 'Sri Mariamman', 'マックスウェル': 'Maxwell', 'ロチョー': 'Rochor',
+  'テロックアヤ': 'Telok Ayer',
 };
 
 // 日本語が含まれていれば辞書で英語に置換（最長一致優先）
