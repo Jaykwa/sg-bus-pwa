@@ -262,36 +262,24 @@ function toggleFavSvc(stop, service) {
   renderFavorites();
 }
 
-// ── 並び替え ──
-// バス停まるごと：配列を直接入れ替え
-function moveFav(code, dir) {
-  const i = favorites.findIndex((s) => s.code === code);
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= favorites.length) return;
-  [favorites[i], favorites[j]] = [favorites[j], favorites[i]];
-  localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
-  renderFavorites();
-}
-// バス番号＋バス停：バス停グループ単位で入れ替え（番号の中身は保つ）
-function moveFavStop(code, dir) {
-  const codes = [];
-  for (const f of favServices) if (!codes.includes(f.code)) codes.push(f.code);
-  const i = codes.indexOf(code);
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= codes.length) return;
-  [codes[i], codes[j]] = [codes[j], codes[i]];
-  const groups = {};
-  for (const f of favServices) (groups[f.code] ??= []).push(f);
-  favServices = codes.flatMap((c) => groups[c]);
-  localStorage.setItem(FAVSVC_KEY, JSON.stringify(favServices));
-  renderFavorites();
-}
-// ▲▼ボタンのHTML（先頭/末尾は無効化）
-function reorderCtrl(isFirst, isLast) {
-  return `<div class="reorder">
-    <button class="rbtn up" ${isFirst ? 'disabled' : ''} title="上へ" aria-label="上へ">▲</button>
-    <button class="rbtn down" ${isLast ? 'disabled' : ''} title="下へ" aria-label="下へ">▼</button>
-  </div>`;
+// ── 並び替え（ドラッグ＆ドロップ：SortableJS）──
+// ドラッグ用つまみのHTML
+const DRAG_HANDLE = '<span class="drag-handle" title="ドラッグで並べ替え">⠿</span>';
+
+// 指定コンテナをドラッグ並べ替え可能にする。確定時に onCommit(順番のcode配列) を呼ぶ
+function makeSortable(container, onCommit) {
+  if (!window.Sortable) return; // ライブラリ未読込なら何もしない（アプリは動く）
+  new Sortable(container, {
+    handle: '.drag-handle',
+    animation: 150,
+    delay: 80,                 // ちょい押しで開始（誤爆防止）
+    delayOnTouchOnly: true,
+    forceFallback: true,       // タッチ挙動を安定させる
+    onEnd: () => {
+      const order = [...container.children].map((c) => c.dataset.code);
+      onCommit(order);
+    },
+  });
 }
 
 function renderFavorites() {
@@ -303,14 +291,15 @@ function renderFavorites() {
   // 路線お気に入り（バス停ごとにまとめてライブETA付き）
   if (favServices.length) {
     el.insertAdjacentHTML('beforeend', '<h3 class="fav-h">🚌 バス番号＋バス停</h3>');
+    const sec = document.createElement('div');
+    sec.className = 'fav-section';
     // バス停ごとにグループ化（登録順を保つ）
     const byStop = new Map();
     for (const f of favServices) {
       if (!byStop.has(f.code)) byStop.set(f.code, { code: f.code, name: f.name, road: f.road, services: [] });
       byStop.get(f.code).services.push(f.service);
     }
-    const groups = [...byStop.values()];
-    groups.forEach((g, gi) => {
+    for (const g of byStop.values()) {
       const card = document.createElement('div');
       card.className = 'stop-card fav-stop';
       card.dataset.code = g.code;
@@ -325,34 +314,48 @@ function renderFavorites() {
             <div class="name">${esc(g.name || g.code)}</div>
             <div class="meta">${esc(g.road || '')} ・ コード ${g.code}</div>
           </div>
-          ${reorderCtrl(gi === 0, gi === groups.length - 1)}
+          ${DRAG_HANDLE}
         </div>
         <div class="fav-svc-lines">${lines}</div>`;
-      card.querySelector('.up').addEventListener('click', (e) => { e.stopPropagation(); moveFavStop(g.code, -1); });
-      card.querySelector('.down').addEventListener('click', (e) => { e.stopPropagation(); moveFavStop(g.code, 1); });
       card.querySelector('.fav-stop-text').addEventListener('click', () => openStop({ code: g.code, name: g.name, road: g.road }));
       card.querySelector('.fav-svc-lines').addEventListener('click', () => openStop({ code: g.code, name: g.name, road: g.road }));
-      el.appendChild(card);
-    });
+      sec.appendChild(card);
+    }
+    el.appendChild(sec);
     refreshFavServiceEtas(); // 初回の数字を埋める
+    // ドラッグ確定：バス停グループの順番で favServices を組み直す（番号の中身は保つ）
+    makeSortable(sec, (order) => {
+      const groups = {};
+      for (const f of favServices) (groups[f.code] ??= []).push(f);
+      favServices = order.flatMap((c) => groups[c] || []);
+      localStorage.setItem(FAVSVC_KEY, JSON.stringify(favServices));
+    });
   }
 
   // バス停まるごとお気に入り
   if (favorites.length) {
     el.insertAdjacentHTML('beforeend', '<h3 class="fav-h">🚏 バス停まるごと</h3>');
-    favorites.forEach((s, i) => {
+    const sec = document.createElement('div');
+    sec.className = 'fav-section';
+    favorites.forEach((s) => {
       const card = document.createElement('div');
       card.className = 'stop-card';
+      card.dataset.code = s.code;
       card.innerHTML = `
         <div class="fav-stop-text">
           <div class="name">★ ${esc(s.name || s.code)}</div>
           <div class="meta">${esc(s.road || '')} ・ コード ${s.code}</div>
         </div>
-        ${reorderCtrl(i === 0, i === favorites.length - 1)}`;
-      card.querySelector('.up').addEventListener('click', (e) => { e.stopPropagation(); moveFav(s.code, -1); });
-      card.querySelector('.down').addEventListener('click', (e) => { e.stopPropagation(); moveFav(s.code, 1); });
+        ${DRAG_HANDLE}`;
       card.querySelector('.fav-stop-text').addEventListener('click', () => openStop(s));
-      el.appendChild(card);
+      sec.appendChild(card);
+    });
+    el.appendChild(sec);
+    // ドラッグ確定：その順番で favorites を組み直す
+    makeSortable(sec, (order) => {
+      const byCode = Object.fromEntries(favorites.map((s) => [s.code, s]));
+      favorites = order.map((c) => byCode[c]).filter(Boolean);
+      localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
     });
   }
 }

@@ -131,14 +131,17 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
 .fav-stop-head .name { font-weight: 600; }
 .fav-stop-head .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
 
-/* 並び替えボタン */
-.reorder { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
-.rbtn {
-  width: 30px; height: 26px; border: 1px solid var(--line); background: #fff;
-  border-radius: 8px; font-size: 12px; color: var(--green); cursor: pointer; line-height: 1;
+/* ドラッグ並べ替え */
+.drag-handle {
+  flex-shrink: 0; cursor: grab; color: #b8c0bc; font-size: 22px; line-height: 1;
+  padding: 4px 6px; touch-action: none; user-select: none; align-self: center;
 }
-.rbtn:disabled { color: #ccc; background: #f6f7f7; cursor: default; }
-.rbtn:active:not(:disabled) { background: var(--green); color: #fff; }
+.drag-handle:active { cursor: grabbing; }
+.fav-section { display: block; }
+/* SortableJS のドラッグ中スタイル */
+.sortable-ghost { opacity: 0.35; }
+.sortable-chosen { box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+.sortable-drag { opacity: 0.95; }
 .fav-svc-lines { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }
 .fav-svc-line {
   display: flex; align-items: center; gap: 8px; padding: 4px 0;
