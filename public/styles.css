@@ -86,6 +86,9 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
 }
 .modal-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
 .modal-actions button { font-size: 20px; background: none; border: none; margin-left: 6px; cursor: pointer; }
+#mRefresh { color: var(--green); display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinning { animation: spin 0.6s linear infinite; }
 .muted { color: var(--muted); font-size: 12px; }
 
 .arr-card { display: flex; align-items: center; gap: 12px; }

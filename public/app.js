@@ -60,6 +60,13 @@ async function init() {
   $('#mClose').addEventListener('click', closeModal);
   $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
   $('#mFav').addEventListener('click', toggleCurrentFav);
+  $('#mRefresh').addEventListener('click', async () => {  // 手動更新
+    if (!currentModalStop) return;
+    const btn = $('#mRefresh');
+    btn.classList.add('spinning');
+    await loadArrivals(currentModalStop.code);
+    btn.classList.remove('spinning');
+  });
 
   document.addEventListener('visibilitychange', onVisibilityChange);
 
