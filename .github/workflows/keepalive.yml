@@ -1,0 +1,17 @@
+name: keepalive
+
+# Render無料プランは15分アクセスが無いと寝てしまい、次回起床に最大50秒かかる。
+# 10分ごとに /api/status を叩いて起こし続ける（GitHubのインフラで実行）。
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # 10分ごと
+  workflow_dispatch:          # 手動実行も可
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the app
+        run: |
+          curl -fsS --max-time 60 https://sg-bus-pwa.onrender.com/api/status \
+            && echo "ok" || echo "ping failed (ignored)"

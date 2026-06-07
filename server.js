@@ -35,6 +35,7 @@ app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'allow' }));
 
 // バス停一覧のキャッシュ（メモリ＋ディスク）
 const STOPS_CACHE_FILE = path.join(__dirname, 'busstops.cache.json');
+const STOPS_SEED_FILE = path.join(__dirname, 'busstops.seed.json'); // リポジトリ同梱（起動を速く）
 let busStops = null;
 
 // ── LTA に投げる小さいヘルパ ──
@@ -70,11 +71,19 @@ async function getBusStops() {
     busStops = MOCK_STOPS;
     return busStops;
   }
-  // ディスクキャッシュがあれば使う（バス停はめったに変わらん）
+  // ① 実行時キャッシュ（手動更新した最新があれば優先）
   if (fs.existsSync(STOPS_CACHE_FILE)) {
     busStops = JSON.parse(fs.readFileSync(STOPS_CACHE_FILE, 'utf8'));
+    console.log(`バス停 ${busStops.length} 件をキャッシュから読み込み`);
     return busStops;
   }
+  // ② リポジトリ同梱のseed（クラウド起動直後でも即ロード＝LTAへ取りに行かへん）
+  if (fs.existsSync(STOPS_SEED_FILE)) {
+    busStops = JSON.parse(fs.readFileSync(STOPS_SEED_FILE, 'utf8'));
+    console.log(`バス停 ${busStops.length} 件を同梱seedから即ロード`);
+    return busStops;
+  }
+  // ③ どちらも無ければLTAから取得（初回フォールバック）
   console.log('LTA からバス停一覧を取得中…（初回だけ時間かかる）');
   busStops = await fetchAllBusStops();
   // クラウドだとファイルシステムが読み取り専用のことがあるので失敗しても落とさへん
