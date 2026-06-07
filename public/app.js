@@ -45,6 +45,11 @@ let map, mapMarkers = [];
 let refreshTimer = null;
 let currentModalStop = null;
 
+// クライアント側の到着データキャッシュ（stale-while-revalidate）
+// 直近に見た/更新したデータを保持し、モーダルを即表示する。60秒以内は「使えるデータ」とみなす。
+const clientArrivalCache = new Map(); // code → { data, ts }
+const CLIENT_STALE_MS = 60_000;
+
 // ── 起動 ──
 init();
 async function init() {
@@ -232,11 +237,18 @@ async function openStop(stop) {
 }
 
 async function loadArrivals(code) {
+  // キャッシュがあれば即表示（スピナー無し → チラつかへん）
+  const cached = clientArrivalCache.get(code);
+  if (cached && Date.now() - cached.ts < CLIENT_STALE_MS) {
+    renderArrivals(cached.data);
+  }
+  // 裏で最新データを取得して上書き
   try {
     const data = await api('/api/arrival?stop=' + code);
+    clientArrivalCache.set(code, { data, ts: Date.now() });
     renderArrivals(data);
   } catch {
-    $('#mBody').innerHTML = '<div class="spin">取得に失敗したわ…</div>';
+    if (!cached) $('#mBody').innerHTML = '<div class="spin">取得に失敗したわ…</div>';
   }
 }
 
@@ -508,6 +520,7 @@ function refreshFavServiceEtas() {
   for (const f of favServices) (byStop[f.code] ??= []).push(f);
   const tasks = Object.keys(byStop).map((code) =>
     api('/api/arrival?stop=' + code).then((data) => {
+      clientArrivalCache.set(code, { data, ts: Date.now() }); // モーダルの即表示に使う
       const svcMap = {};
       for (const sv of data.services || []) svcMap[sv.service] = sv.buses || [];
       for (const f of byStop[code]) {

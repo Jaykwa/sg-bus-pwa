@@ -33,6 +33,26 @@ const app = express();
 // .well-known/assetlinks.json も配信する（TWAでURLバーを消すのに必要）
 app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'allow' }));
 
+// ── 到着データのサーバー側キャッシュ（15秒TTL）──
+// LTA DataMall は約20秒ごと更新なので、15秒キャッシュしてもデータの鮮度はほぼ変わらへん。
+// 複数タブ・お気に入り自動更新・モーダル自動更新が重なっても LTA への問い合わせを間引ける。
+const arrivalCache = new Map(); // code → { data, ts }
+const ARRIVAL_TTL_MS = 15_000;  // 15秒
+
+function getCachedArrival(stop) {
+  const hit = arrivalCache.get(stop);
+  if (hit && Date.now() - hit.ts < ARRIVAL_TTL_MS) return hit.data;
+  return null;
+}
+function setCachedArrival(stop, data) {
+  arrivalCache.set(stop, { data, ts: Date.now() });
+  // メモリリーク防止：古いエントリを間引く（1000件超えたら一番古いものから消す）
+  if (arrivalCache.size > 1000) {
+    const oldest = [...arrivalCache.entries()].sort((a, b) => a[1].ts - b[1].ts)[0][0];
+    arrivalCache.delete(oldest);
+  }
+}
+
 // バス停一覧のキャッシュ（メモリ＋ディスク）
 const STOPS_CACHE_FILE = path.join(__dirname, 'busstops.cache.json');
 const STOPS_SEED_FILE = path.join(__dirname, 'busstops.seed.json'); // リポジトリ同梱（起動を速く）
@@ -117,8 +137,17 @@ app.get('/api/arrival', async (req, res) => {
   if (!stop) return res.status(400).json({ error: 'stop が要るで' });
   try {
     if (USE_MOCK) return res.json(mockArrival(stop));
+    // キャッシュヒットなら即返却（LTA API を叩かへん）
+    const cached = getCachedArrival(stop);
+    if (cached) {
+      res.setHeader('X-Cache', 'HIT');
+      return res.json(cached);
+    }
     const data = await ltaFetch(`v3/BusArrival?BusStopCode=${stop}`);
-    res.json(normalizeArrival(stop, data));
+    const result = normalizeArrival(stop, data);
+    setCachedArrival(stop, result);
+    res.setHeader('X-Cache', 'MISS');
+    res.json(result);
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
