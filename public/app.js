@@ -60,6 +60,12 @@ async function init() {
   $('#mClose').addEventListener('click', closeModal);
   $('#modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
   $('#mFav').addEventListener('click', toggleCurrentFav);
+  $('#favRefresh').addEventListener('click', async () => {  // お気に入り全体を手動更新
+    const ic = $('#favRefresh .ref-ic');
+    ic.classList.add('spinning');
+    await refreshFavServiceEtas();
+    setTimeout(() => ic.classList.remove('spinning'), 400);
+  });
   $('#mRefresh').addEventListener('click', async () => {  // 手動更新
     if (!currentModalStop) return;
     const btn = $('#mRefresh');
@@ -348,10 +354,69 @@ function makeSortable(container, onCommit) {
   });
 }
 
+// 右スワイプ中の直後はタップ（到着を開く）を抑制するフラグ
+let suppressOpen = false;
+
+// カードを右スワイプで削除できるようにする。閾値超えたら onDelete()
+function enableSwipeDelete(card, onDelete) {
+  let startX = 0, startY = 0, active = false, decided = false, horiz = false;
+  card.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('.drag-handle')) return; // つまみは並べ替え優先
+    active = true; decided = false; horiz = false;
+    startX = e.clientX; startY = e.clientY;
+    card.style.transition = '';
+  });
+  card.addEventListener('pointermove', (e) => {
+    if (!active) return;
+    const dx = e.clientX - startX, dy = e.clientY - startY;
+    if (!decided && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+      decided = true;
+      horiz = Math.abs(dx) > Math.abs(dy);
+      if (horiz) card.setPointerCapture(e.pointerId);
+    }
+    if (decided && horiz) {
+      e.preventDefault();
+      const x = Math.max(0, dx); // 右方向だけ
+      card.style.transform = `translateX(${x}px)`;
+      card.parentElement.classList.toggle('will-delete', x > card.offsetWidth * 0.4);
+    }
+  });
+  const finish = (e) => {
+    if (!active) return; active = false;
+    if (!decided || !horiz) return;
+    const dx = e.clientX - startX;
+    const w = card.offsetWidth;
+    card.style.transition = 'transform .2s ease, opacity .2s ease';
+    if (dx > w * 0.4) {
+      card.style.transform = `translateX(${w}px)`;
+      card.style.opacity = '0';
+      suppressOpen = true; setTimeout(() => { suppressOpen = false; }, 400);
+      setTimeout(onDelete, 180);
+    } else {
+      card.style.transform = '';
+      card.parentElement.classList.remove('will-delete');
+    }
+  };
+  card.addEventListener('pointerup', finish);
+  card.addEventListener('pointercancel', finish);
+}
+
+// カードを削除可能なラッパで包む
+function wrapSwipe(card, code, onDelete) {
+  const item = document.createElement('div');
+  item.className = 'swipe-item';
+  item.dataset.code = code; // SortableJS が順番を読む
+  item.innerHTML = '<div class="swipe-bg">🗑 削除</div>';
+  item.appendChild(card);
+  enableSwipeDelete(card, onDelete);
+  return item;
+}
+
 function renderFavorites() {
   const el = $('#favList');
   const empty = !favorites.length && !favServices.length;
   $('#favHint').style.display = empty ? 'block' : 'none';
+  $('#favToolbar').style.display = empty ? 'none' : 'flex';
   el.innerHTML = '';
 
   // 路線お気に入り（バス停ごとにまとめてライブETA付き）
@@ -383,9 +448,14 @@ function renderFavorites() {
           ${DRAG_HANDLE}
         </div>
         <div class="fav-svc-lines">${lines}</div>`;
-      card.querySelector('.fav-stop-text').addEventListener('click', () => openStop({ code: g.code, name: g.name, road: g.road }));
-      card.querySelector('.fav-svc-lines').addEventListener('click', () => openStop({ code: g.code, name: g.name, road: g.road }));
-      sec.appendChild(card);
+      const open = () => { if (!suppressOpen) openStop({ code: g.code, name: g.name, road: g.road }); };
+      card.querySelector('.fav-stop-text').addEventListener('click', open);
+      card.querySelector('.fav-svc-lines').addEventListener('click', open);
+      sec.appendChild(wrapSwipe(card, g.code, () => {
+        favServices = favServices.filter((f) => f.code !== g.code); // この停留所の番号を全部削除
+        localStorage.setItem(FAVSVC_KEY, JSON.stringify(favServices));
+        renderFavorites();
+      }));
     }
     el.appendChild(sec);
     refreshFavServiceEtas(); // 初回の数字を埋める
@@ -413,8 +483,12 @@ function renderFavorites() {
           <div class="meta">${esc(s.road || '')} ・ コード ${s.code}</div>
         </div>
         ${DRAG_HANDLE}`;
-      card.querySelector('.fav-stop-text').addEventListener('click', () => openStop(s));
-      sec.appendChild(card);
+      card.querySelector('.fav-stop-text').addEventListener('click', () => { if (!suppressOpen) openStop(s); });
+      sec.appendChild(wrapSwipe(card, s.code, () => {
+        favorites = favorites.filter((f) => f.code !== s.code);
+        localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
+        renderFavorites();
+      }));
     });
     el.appendChild(sec);
     // ドラッグ確定：その順番で favorites を組み直す
@@ -426,13 +500,13 @@ function renderFavorites() {
   }
 }
 
-// お気に入り路線のETAだけ更新（カードは作り直さへんのでチラつかへん）
+// お気に入り路線のETAだけ更新（カードは作り直さへんのでチラつかへん）。Promiseを返す
 function refreshFavServiceEtas() {
-  if (!favServices.length) return;
+  if (!favServices.length) return Promise.resolve();
   // 同じバス停は1回だけ問い合わせる
   const byStop = {};
   for (const f of favServices) (byStop[f.code] ??= []).push(f);
-  for (const code of Object.keys(byStop)) {
+  const tasks = Object.keys(byStop).map((code) =>
     api('/api/arrival?stop=' + code).then((data) => {
       const svcMap = {};
       for (const sv of data.services || []) svcMap[sv.service] = sv.buses || [];
@@ -450,8 +524,9 @@ function refreshFavServiceEtas() {
             }).join(' ')
           : '<span class="muted">運行情報なし</span>';
       }
-    }).catch(() => {});
-  }
+    }).catch(() => {})
+  );
+  return Promise.all(tasks);
 }
 
 let favTimer = null;
