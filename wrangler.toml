@@ -14,3 +14,7 @@ compatibility_date = "2024-11-01"
 [assets]
 directory = "./public"
 binding = "ASSETS"
+# 既定だと /index.html → / に307リダイレクトされ、TWA(Androidアプリ)の起動URL
+# (/index.html)がコケる。"none" でリダイレクトを止め、/index.html を素直に200で返す。
+# 代わりにトップ "/" は worker.js が index.html を返す。
+html_handling = "none"

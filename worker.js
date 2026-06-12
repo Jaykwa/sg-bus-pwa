@@ -86,6 +86,12 @@ export default {
         return json(assetLinks);
       }
 
+      // html_handling="none" にしたので、トップ "/" は worker が index.html を返す。
+      // （/index.html はアセット層がそのまま200で返す＝TWAの起動URLがコケへん）
+      if (path === '/' || path === '') {
+        return env.ASSETS.fetch(new Request(new URL('/index.html', request.url), request));
+      }
+
       // 到着予想
       if (path === '/api/arrival') {
         const stop = url.searchParams.get('stop');
