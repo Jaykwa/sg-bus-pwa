@@ -2,6 +2,9 @@ node_modules/
 .env
 busstops.cache.json
 *.log
+# Cloudflare Workers
+.wrangler/
+.dev.vars
 # APKビルド作業用（ローカル専用）
 android-build/
 *.jar

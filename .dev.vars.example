@@ -1,0 +1,4 @@
+# ローカルで `npx wrangler dev` する時の鍵。
+# このファイルを .dev.vars にコピーして、自分のキーを入れてや。
+# 本番（Cloudflare）には `npx wrangler secret put LTA_ACCOUNT_KEY` で別途登録する。
+LTA_ACCOUNT_KEY=ここにLTAのAccountKeyを入れる

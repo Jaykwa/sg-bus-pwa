@@ -30,7 +30,11 @@ const USE_MOCK = !ACCOUNT_KEY;
 const LTA_BASE = 'https://datamall2.mytransport.sg/ltaodataservice';
 
 const app = express();
-// .well-known/assetlinks.json も配信する（TWAでURLバーを消すのに必要）
+// TWAでURLバーを消すのに必要。assetlinks.json はリポジトリ直下に置いてあるので明示配信する
+// （Cloudflare Workers と置き場所を揃えるため public の外に出した）。
+app.get('/.well-known/assetlinks.json', (req, res) => {
+  res.sendFile(path.join(__dirname, 'assetlinks.json'));
+});
 app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'allow' }));
 
 // ── 到着データのサーバー側キャッシュ（15秒TTL）──

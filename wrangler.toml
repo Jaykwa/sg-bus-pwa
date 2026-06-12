@@ -1,0 +1,16 @@
+# Cloudflare Workers 設定
+# デプロイ: npx wrangler deploy
+# 鍵の設定: npx wrangler secret put LTA_ACCOUNT_KEY
+# ローカル開発: npx wrangler dev  （.dev.vars に LTA_ACCOUNT_KEY を書く）
+
+name = "sg-bus-pwa"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# public/ をそのまま静的配信する。
+# ・パスが静的ファイルに一致 → CF が直接返す（Worker を通らへん＝速い）
+# ・一致せえへん（/api/* など） → worker.js が処理する
+# ・binding で Worker から env.ASSETS.fetch() も使えるが、今回は使わへん
+[assets]
+directory = "./public"
+binding = "ASSETS"
