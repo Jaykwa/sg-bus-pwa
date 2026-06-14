@@ -1,13 +1,27 @@
 // ───────────────────────────────────────────────────────────
-//  SG Bus PWA  中継サーバー（プロキシ）
+//  SG Bus PWA  中継サーバー（プロキシ）※ローカル開発／Render用
 //  役割：LTA DataMall API に AccountKey を付けて転送する。
 //        鍵はここ（サーバー）に隠すので、ブラウザには出さへん。
 //        鍵が無いときは自動でモックデータを返す。
+//
+//  コアロジック（整形・検索・距離・モック・キャッシュ・濫用ガード）は
+//  lib/busapi.js に集約。ここは Express の受け口＋バス停データ供給だけ。
+//  本番（Cloudflare Workers）は worker.js が同じ lib を使う。
 // ───────────────────────────────────────────────────────────
 import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  MOCK_STOPS,
+  ltaFetch,
+  handleArrival,
+  handleSearch,
+  handleNearby,
+  handleStop,
+  handleStatus,
+  isAllowedApiRequest,
+} from './lib/busapi.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,7 +41,6 @@ loadEnv();
 const ACCOUNT_KEY = process.env.LTA_ACCOUNT_KEY?.trim() || '';
 const PORT = process.env.PORT || 3000;
 const USE_MOCK = !ACCOUNT_KEY;
-const LTA_BASE = 'https://datamall2.mytransport.sg/ltaodataservice';
 
 const app = express();
 // TWAでURLバーを消すのに必要。assetlinks.json はリポジトリ直下に置いてあるので明示配信する
@@ -37,45 +50,16 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
 });
 app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'allow' }));
 
-// ── 到着データのサーバー側キャッシュ（15秒TTL）──
-// LTA DataMall は約20秒ごと更新なので、15秒キャッシュしてもデータの鮮度はほぼ変わらへん。
-// 複数タブ・お気に入り自動更新・モーダル自動更新が重なっても LTA への問い合わせを間引ける。
-const arrivalCache = new Map(); // code → { data, ts }
-const ARRIVAL_TTL_MS = 15_000;  // 15秒
-
-function getCachedArrival(stop) {
-  const hit = arrivalCache.get(stop);
-  if (hit && Date.now() - hit.ts < ARRIVAL_TTL_MS) return hit.data;
-  return null;
-}
-function setCachedArrival(stop, data) {
-  arrivalCache.set(stop, { data, ts: Date.now() });
-  // メモリリーク防止：古いエントリを間引く（1000件超えたら一番古いものから消す）
-  if (arrivalCache.size > 1000) {
-    const oldest = [...arrivalCache.entries()].sort((a, b) => a[1].ts - b[1].ts)[0][0];
-    arrivalCache.delete(oldest);
-  }
-}
-
 // バス停一覧のキャッシュ（メモリ＋ディスク）
 const STOPS_CACHE_FILE = path.join(__dirname, 'busstops.cache.json');
 const STOPS_SEED_FILE = path.join(__dirname, 'busstops.seed.json'); // リポジトリ同梱（起動を速く）
 let busStops = null;
 
-// ── LTA に投げる小さいヘルパ ──
-async function ltaFetch(endpoint) {
-  const res = await fetch(`${LTA_BASE}/${endpoint}`, {
-    headers: { AccountKey: ACCOUNT_KEY, accept: 'application/json' },
-  });
-  if (!res.ok) throw new Error(`LTA ${res.status}: ${await res.text()}`);
-  return res.json();
-}
-
 // ── バス停一覧を全件取得（500件ずつページング）──
 async function fetchAllBusStops() {
   const all = [];
   for (let skip = 0; skip < 10000; skip += 500) {
-    const data = await ltaFetch(`BusStops?$skip=${skip}`);
+    const data = await ltaFetch(`BusStops?$skip=${skip}`, ACCOUNT_KEY);
     const rows = data.value || [];
     all.push(...rows);
     if (rows.length < 500) break; // 最後のページ
@@ -120,38 +104,27 @@ async function getBusStops() {
   return busStops;
 }
 
-// 2点間の距離（メートル, Haversine）
-function distM(aLat, aLng, bLat, bLng) {
-  const R = 6371000;
-  const dLat = ((bLat - aLat) * Math.PI) / 180;
-  const dLng = ((bLng - aLng) * Math.PI) / 180;
-  const s =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((aLat * Math.PI) / 180) *
-      Math.cos((bLat * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  return Math.round(R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s)));
+// ハンドラの { status, body, headers } を Express レスポンスに変換
+function send(res, { status, body, headers }) {
+  if (headers) for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
+  res.status(status).json(body);
 }
 
 // ───────────── API ルート ─────────────
 
+// 稼働状態は監視用に常に開けておく（濫用ガードの対象外）
+app.get('/api/status', (req, res) => send(res, handleStatus(USE_MOCK)));
+
+// ここから先のデータAPIは「自オリジンからの呼び出し」だけ許可（タダ乗り防止）
+app.use('/api', (req, res, next) => {
+  if (isAllowedApiRequest((k) => req.get(k), req.get('host'))) return next();
+  res.status(403).json({ error: 'このAPIは公開しとらんで' });
+});
+
 // 到着予想
 app.get('/api/arrival', async (req, res) => {
-  const stop = req.query.stop;
-  if (!stop) return res.status(400).json({ error: 'stop が要るで' });
   try {
-    if (USE_MOCK) return res.json(mockArrival(stop));
-    // キャッシュヒットなら即返却（LTA API を叩かへん）
-    const cached = getCachedArrival(stop);
-    if (cached) {
-      res.setHeader('X-Cache', 'HIT');
-      return res.json(cached);
-    }
-    const data = await ltaFetch(`v3/BusArrival?BusStopCode=${stop}`);
-    const result = normalizeArrival(stop, data);
-    setCachedArrival(stop, result);
-    res.setHeader('X-Cache', 'MISS');
-    res.json(result);
+    send(res, await handleArrival(req.query.stop, { key: ACCOUNT_KEY, useMock: USE_MOCK }));
   } catch (e) {
     res.status(502).json({ error: String(e) });
   }
@@ -159,96 +132,18 @@ app.get('/api/arrival', async (req, res) => {
 
 // バス停検索（コード・名前・道路名で部分一致）
 app.get('/api/search', async (req, res) => {
-  const q = (req.query.q || '').toString().trim().toLowerCase();
-  if (!q) return res.json([]);
-  const stops = await getBusStops();
-  const hit = stops.filter(
-    (s) =>
-      s.code.includes(q) ||
-      (s.name || '').toLowerCase().includes(q) ||
-      (s.road || '').toLowerCase().includes(q)
-  );
-  res.json(hit.slice(0, 50));
+  send(res, handleSearch(req.query.q, await getBusStops()));
 });
 
 // 現在地から近い順
 app.get('/api/nearby', async (req, res) => {
-  const lat = parseFloat(req.query.lat);
-  const lng = parseFloat(req.query.lng);
-  if (Number.isNaN(lat) || Number.isNaN(lng))
-    return res.status(400).json({ error: 'lat,lng が要るで' });
-  const stops = await getBusStops();
-  const withDist = stops
-    .map((s) => ({ ...s, dist: distM(lat, lng, s.lat, s.lng) }))
-    .sort((a, b) => a.dist - b.dist)
-    .slice(0, 20);
-  res.json(withDist);
+  send(res, handleNearby(req.query.lat, req.query.lng, await getBusStops()));
 });
 
 // 1件のバス停情報（地図ピン用）
 app.get('/api/stop/:code', async (req, res) => {
-  const stops = await getBusStops();
-  const s = stops.find((x) => x.code === req.params.code);
-  if (!s) return res.status(404).json({ error: 'みつからへん' });
-  res.json(s);
+  send(res, handleStop(req.params.code, await getBusStops()));
 });
-
-app.get('/api/status', (req, res) => {
-  res.json({ mock: USE_MOCK, keyConfigured: !USE_MOCK });
-});
-
-// LTA の到着レスポンスを画面用に整形
-function normalizeArrival(stop, data) {
-  const now = Date.now();
-  const services = (data.Services || []).map((sv) => {
-    const buses = ['NextBus', 'NextBus2', 'NextBus3']
-      .map((k) => sv[k])
-      .filter((b) => b && b.EstimatedArrival)
-      .map((b) => ({
-        etaMin: Math.max(
-          0,
-          Math.round((new Date(b.EstimatedArrival).getTime() - now) / 60000)
-        ),
-        load: b.Load, // SEA=空, SDA=やや混, LSD=満員
-        type: b.Type, // SD=普通, DD=2階建, BD=連節
-        feature: b.Feature, // WAB=車椅子対応
-      }));
-    return { service: sv.ServiceNo, operator: sv.Operator, buses };
-  });
-  services.sort((a, b) => a.service.localeCompare(b.service, 'en', { numeric: true }));
-  return { stop, services };
-}
-
-// ───────────── モックデータ ─────────────
-const MOCK_STOPS = [
-  { code: '83139', road: 'Upp Changi Rd East', name: 'Opp Tropicana Condo', lat: 1.34041, lng: 103.96337 },
-  { code: '01012', road: 'Victoria St', name: 'Hotel Grand Pacific', lat: 1.29684, lng: 103.85253 },
-  { code: '01112', road: 'Bras Basah Rd', name: "St. Joseph's Ch", lat: 1.29770, lng: 103.85369 },
-  { code: '09022', road: 'Orchard Rd', name: 'Orchard Stn/Tang Plaza', lat: 1.30420, lng: 103.83217 },
-  { code: '09047', road: 'Orchard Blvd', name: 'Orchard Stn Exit 13', lat: 1.30362, lng: 103.83179 },
-  { code: '04167', road: 'Raffles Quay', name: 'Opp Capital Twr', lat: 1.27732, lng: 103.84675 },
-  { code: '14141', road: 'Sentosa Gateway', name: 'Resorts World Sentosa', lat: 1.25434, lng: 103.82087 },
-  { code: '46009', road: 'Woodlands Ave 5', name: 'Woodlands Stn', lat: 1.43699, lng: 103.78641 },
-];
-
-function mockArrival(stop) {
-  const seed = Number(stop.replace(/\D/g, '').slice(-3)) || 7;
-  const rnd = (n) => ((seed * (n + 3) * 7919) % 23);
-  const loads = ['SEA', 'SDA', 'LSD'];
-  const types = ['SD', 'DD', 'BD'];
-  const svcNames = ['12', '32', '57', '107', '961', 'NR7'];
-  const services = svcNames.slice(0, 4 + (seed % 3)).map((name, i) => ({
-    service: name,
-    operator: 'SBST',
-    buses: [0, 1, 2].map((j) => ({
-      etaMin: (rnd(i * 3 + j) + j * 6) % 30,
-      load: loads[(seed + i + j) % 3],
-      type: types[(i + j) % 3],
-      feature: (i + j) % 2 ? 'WAB' : '',
-    })).sort((a, b) => a.etaMin - b.etaMin),
-  }));
-  return { stop, services, _mock: true };
-}
 
 app.listen(PORT, () => {
   console.log(`\n🚌 SG Bus PWA → http://localhost:${PORT}`);
