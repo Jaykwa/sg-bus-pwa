@@ -282,17 +282,12 @@ function renderArrivals(data) {
   $('#mFoot').textContent = `更新 ${now}${data._mock ? '（モックデータ）' : ''} ・ 20秒ごとに自動更新`;
 }
 
-// 混雑度バッジ（色付き）。SEA=空き / SDA=やや混 / LSD=満員
+// 混雑度の区分。SEA=空き / SDA=やや混 / LSD=満員（到着数字の色分けに使う）
 const LOAD_INFO = {
-  SEA: { cls: 'low',  icon: '🟢', text: '空き' },
-  SDA: { cls: 'mid',  icon: '🟡', text: 'やや混' },
-  LSD: { cls: 'high', icon: '🔴', text: '満員' },
+  SEA: { cls: 'low' },
+  SDA: { cls: 'mid' },
+  LSD: { cls: 'high' },
 };
-function loadBadge(load) {
-  const info = LOAD_INFO[load];
-  if (!info) return '<span class="load-badge load-na">—</span>';
-  return `<span class="load-badge load-${info.cls}">${info.icon} ${info.text}</span>`;
-}
 
 // 到着時間の数字を「混雑度」で色分けするためのクラス。
 // 緑=空き(SEA) / オレンジ=やや混(SDA) / 赤=満員(LSD)。混雑度不明はデフォルト色。
@@ -315,7 +310,6 @@ function etaHtml(b) {
   const num = b.etaMin <= 0 ? '到着' : `${b.etaMin}<span class="unit">分</span>`;
   return `<div class="eta">
     <div class="min ${cls}">${num}</div>
-    ${loadBadge(b.load)}
     ${vehicleIcons(b)}
   </div>`;
 }

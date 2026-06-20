@@ -108,14 +108,6 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
 .ic { display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center; color: var(--muted); }
 .ic svg { width: 16px; height: 16px; display: block; }
 .ic-emoji { font-size: 14px; line-height: 1; }
-.load-badge {
-  display: inline-block; margin-top: 3px; font-size: 10px; font-weight: 700;
-  padding: 1px 6px; border-radius: 999px; white-space: nowrap; line-height: 1.5;
-}
-.load-low  { background: #e3f5e9; color: #0b6b3a; }
-.load-mid  { background: #fdf0d9; color: #9a6200; }
-.load-high { background: #fde3e3; color: #b32020; }
-.load-na   { background: #eee; color: #999; }
 .spin { text-align: center; padding: 24px; color: var(--muted); }
 
 /* 路線ごとのお気に入り★（到着カード内） */
