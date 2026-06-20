@@ -100,9 +100,10 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
 .eta { text-align: center; flex: 1; }
 .eta .min { font-size: 22px; font-weight: 800; line-height: 1.1; }
 .eta .min .unit { font-size: 11px; font-weight: 600; margin-left: 1px; }
-.eta .min.soon { color: var(--eta-soon); }
-.eta .min.mid  { color: var(--eta-mid); }
-.eta .min.far  { color: var(--eta-far); }
+/* 数字の色は混雑度ベース：空き=緑 / やや混=オレンジ / 満員=赤 */
+.eta .min.lc-low  { color: var(--eta-far); }
+.eta .min.lc-mid  { color: var(--eta-mid); }
+.eta .min.lc-high { color: var(--eta-soon); }
 .ic-row { display: flex; gap: 4px; justify-content: center; margin-top: 3px; }
 .ic { display: inline-flex; width: 16px; height: 16px; align-items: center; justify-content: center; color: var(--muted); }
 .ic svg { width: 16px; height: 16px; display: block; }
@@ -170,6 +171,6 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
 .fav-svc-line + .fav-svc-line { border-top: 1px dashed var(--line); }
 .fav-svc-line .right { font-size: 13px; }
 .fav-svc-line .right .min { font-weight: 800; margin-left: 6px; }
-.fav-svc-line .right .min.soon { color: var(--eta-soon); }
-.fav-svc-line .right .min.mid  { color: var(--eta-mid); }
-.fav-svc-line .right .min.far  { color: var(--eta-far); }
+.fav-svc-line .right .min.lc-low  { color: var(--eta-far); }
+.fav-svc-line .right .min.lc-mid  { color: var(--eta-mid); }
+.fav-svc-line .right .min.lc-high { color: var(--eta-soon); }

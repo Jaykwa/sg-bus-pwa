@@ -81,7 +81,7 @@ async function init() {
 
   document.addEventListener('visibilitychange', onVisibilityChange);
 
-  renderFavorites();
+  switchTab('fav'); // 起動時はお気に入りタブを表示（描画＋30秒更新も開始）
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
@@ -294,6 +294,13 @@ function loadBadge(load) {
   return `<span class="load-badge load-${info.cls}">${info.icon} ${info.text}</span>`;
 }
 
+// 到着時間の数字を「混雑度」で色分けするためのクラス。
+// 緑=空き(SEA) / オレンジ=やや混(SDA) / 赤=満員(LSD)。混雑度不明はデフォルト色。
+function loadColorClass(load) {
+  const info = LOAD_INFO[load];
+  return info ? 'lc-' + info.cls : '';
+}
+
 // 車種・設備のアイコン列（♿と同サイズ）
 function vehicleIcons(b) {
   const out = [];
@@ -304,7 +311,7 @@ function vehicleIcons(b) {
 }
 
 function etaHtml(b) {
-  const cls = b.etaMin <= 2 ? 'soon' : b.etaMin <= 8 ? 'mid' : 'far';
+  const cls = loadColorClass(b.load); // 混雑度で色分け（緑→オレンジ→赤）
   const num = b.etaMin <= 0 ? '到着' : `${b.etaMin}<span class="unit">分</span>`;
   return `<div class="eta">
     <div class="min ${cls}">${num}</div>
@@ -532,7 +539,7 @@ function refreshFavServiceEtas() {
         cell.innerHTML = buses.length
           ? buses.slice(0, 2).map((b) => {
               const t = b.etaMin <= 0 ? '到着' : b.etaMin + '分';
-              const cls = b.etaMin <= 2 ? 'soon' : b.etaMin <= 8 ? 'mid' : 'far';
+              const cls = loadColorClass(b.load); // 混雑度で色分け（緑→オレンジ→赤）
               return `<span class="min ${cls}">${t}</span>`;
             }).join(' ')
           : '<span class="muted">運行情報なし</span>';
