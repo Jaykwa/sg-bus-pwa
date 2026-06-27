@@ -153,6 +153,37 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
   background: var(--card); border: 1px solid var(--line); border-radius: 12px;
 }
 .notify-label { font-size: 13px; font-weight: 700; color: var(--ink); }
+.notify-actions { display: flex; gap: 8px; flex-shrink: 0; }
+#schedOpen { border: 1px solid var(--line); background: #fff; color: var(--green);
+  border-radius: 10px; padding: 7px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* 通知スケジュールのモーダル中身 */
+#schedNotice { margin-bottom: 10px; line-height: 1.7; }
+.sched-enable, .sched-add {
+  border: none; background: var(--green); color: #fff; border-radius: 8px;
+  padding: 6px 12px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.sched-empty { padding: 10px 2px; }
+.sched-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 12px; margin-bottom: 8px; font-size: 14px;
+}
+.sched-del { border: none; background: #fde3e3; color: #b32020; border-radius: 8px;
+  padding: 5px 10px; font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+.sched-form-h { font-weight: 700; margin: 14px 0 8px; }
+.sched-input { width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 10px; font-size: 15px; background: var(--card); margin-bottom: 8px; }
+.sched-days { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.sched-day {
+  flex: 1; min-width: 36px; padding: 8px 0; border: 1px solid var(--line);
+  background: var(--card); color: var(--muted); border-radius: 8px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.sched-day.on { background: var(--green); color: #fff; border-color: var(--green); }
+.sched-time-row { display: flex; gap: 8px; align-items: center; }
+.sched-time-row .sched-input { margin-bottom: 0; flex: 1; }
+.sched-add { flex-shrink: 0; padding: 10px 16px; }
 
 /* お気に入りツールバー（更新ボタン） */
 .fav-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; }

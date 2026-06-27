@@ -18,6 +18,8 @@ import seedStops from './busstops.seed.json';
 import assetLinks from './assetlinks.json';
 import {
   MOCK_STOPS,
+  ltaFetch,
+  normalizeArrival,
   handleArrival,
   handleSearch,
   handleNearby,
@@ -26,7 +28,7 @@ import {
   isAllowedApiRequest,
 } from './lib/busapi.js';
 import { verifyGoogleToken } from './lib/googleAuth.js';
-import { sendPushEmpty } from './lib/webpush.js';
+import { sendPush } from './lib/webpush.js';
 
 // Authorization: Bearer <token> から ID トークンを取り出す
 function bearer(request) {
@@ -138,8 +140,9 @@ export default {
         if (!list.length) return json({ error: '通知の購読がまだ無いで', sent: 0 }, { status: 400 });
         let sent = 0;
         const alive = [];
+        const payload = { title: '🚌 SG Bus 通知テスト', body: '本文付き通知のテストやで！届いたら設定OK📩' };
         for (const sub of list) {
-          const st = await sendPushEmpty(sub, env).catch(() => 0);
+          const st = await sendPush(sub, payload, env).catch(() => 0);
           if (st === 404 || st === 410) continue;       // 無効な購読は捨てる
           alive.push(sub);
           if (st >= 200 && st < 300) sent++;
@@ -148,15 +151,97 @@ export default {
         return json({ ok: true, sent });
       }
 
+      // 到着通知スケジュール（曜日×時刻）の取得／保存（要 Googleログイン）
+      if (path === '/api/schedules') {
+        const user = await verifyGoogleToken(bearer(request), env.GOOGLE_CLIENT_ID);
+        if (!user) return json({ error: 'ログインが必要やで' }, { status: 401 });
+        const key = 'sched:' + user.sub;
+        if (request.method === 'GET') {
+          const data = await env.FAV_KV.get(key);
+          return json(data ? JSON.parse(data) : []);
+        }
+        if (request.method === 'PUT' || request.method === 'POST') {
+          const body = await request.json().catch(() => null);
+          if (!Array.isArray(body)) return json({ error: 'bad body' }, { status: 400 });
+          const clean = body.slice(0, 50).map((s) => ({
+            id: String(s.id || ''),
+            code: String(s.code || ''),
+            name: String(s.name || ''),
+            road: String(s.road || ''),
+            service: String(s.service || ''),
+            days: Array.isArray(s.days) ? [...new Set(s.days.filter((d) => d >= 0 && d <= 6))] : [],
+            time: /^\d{2}:\d{2}$/.test(s.time) ? s.time : '',
+          })).filter((s) => s.code && s.service && s.days.length && s.time);
+          await env.FAV_KV.put(key, JSON.stringify(clean));
+          return json({ ok: true });
+        }
+        return json({ error: 'method' }, { status: 405 });
+      }
+
       // /api/* 以外がここに来ることは基本ない（静的アセットが先に処理される）
       return json({ error: 'not found' }, { status: 404 });
     } catch (e) {
       return json({ error: String(e) }, { status: 502 });
     }
   },
+
+  // Cron Trigger（wrangler.toml の crons）。毎分、到着通知のスケジュールを処理する。
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runSchedules(env));
+  },
 };
 
 // ハンドラの { status, body, headers } を Response に変換
 function reply({ status, body, headers }) {
   return json(body, { status, headers });
+}
+
+// ───────────── Cron：到着通知のスケジュール実行 ─────────────
+// 毎分発火。シンガポール時刻で「今この分」に一致するスケジュールへ通知を送る。
+async function runSchedules(env) {
+  const KEY = (env.LTA_ACCOUNT_KEY || '').trim();
+  if (!KEY) return;
+  // シンガポール時刻（UTC+8 固定・夏時間なし）
+  const sg = new Date(Date.now() + 8 * 3600 * 1000);
+  const day = sg.getUTCDay(); // 0=日〜6=土
+  const hhmm = String(sg.getUTCHours()).padStart(2, '0') + ':' + String(sg.getUTCMinutes()).padStart(2, '0');
+
+  let cursor;
+  do {
+    const res = await env.FAV_KV.list({ prefix: 'sched:', cursor });
+    cursor = res.list_complete ? null : res.cursor;
+    for (const k of res.keys) {
+      const schedules = JSON.parse((await env.FAV_KV.get(k.name)) || '[]');
+      const due = schedules.filter((s) => s.time === hhmm && Array.isArray(s.days) && s.days.includes(day));
+      if (!due.length) continue;
+      const sub = k.name.slice('sched:'.length);
+      const pushSubs = JSON.parse((await env.FAV_KV.get('push:' + sub)) || '[]');
+      if (!pushSubs.length) continue;
+      for (const sc of due) {
+        const payload = await buildSchedulePayload(sc, KEY);
+        if (!payload) continue;
+        for (const ps of pushSubs) await sendPush(ps, payload, env).catch(() => {});
+      }
+    }
+  } while (cursor);
+}
+
+// 1件のスケジュール → 「3便分の到着」を本文にした通知ペイロード
+async function buildSchedulePayload(sc, key) {
+  try {
+    const data = await ltaFetch(`v3/BusArrival?BusStopCode=${sc.code}`, key);
+    const norm = normalizeArrival(sc.code, data);
+    const svc = norm.services.find((x) => x.service === sc.service);
+    const buses = (svc && svc.buses) || [];
+    const dot = { SEA: '🟢', SDA: '🟠', LSD: '🔴' };
+    const parts = buses.slice(0, 3).map((b) => (dot[b.load] || '⚪') + (b.etaMin <= 0 ? '到着' : b.etaMin + '分'));
+    return {
+      title: `🚌 ${sc.service}番 @ ${sc.name || sc.code}`,
+      body: parts.length ? parts.join('  ') : '今は運行情報が無いみたい',
+      tag: 'sched-' + sc.code + '-' + sc.service,
+      url: './index.html',
+    };
+  } catch {
+    return null;
+  }
 }

@@ -76,6 +76,9 @@ async function init() {
     setTimeout(() => ic.classList.remove('spinning'), 400);
   });
   $('#notifyTest')?.addEventListener('click', enableNotificationsAndTest); // 通知テスト
+  $('#schedOpen')?.addEventListener('click', openSchedModal);              // 通知スケジュール設定
+  $('#schedClose')?.addEventListener('click', closeSchedModal);
+  $('#schedModal')?.addEventListener('click', (e) => { if (e.target.id === 'schedModal') closeSchedModal(); });
   $('#mRefresh').addEventListener('click', async () => {  // 手動更新
     if (!currentModalStop) return;
     const btn = $('#mRefresh');
@@ -410,7 +413,8 @@ async function syncOnLogin() {
   localStorage.setItem(FAVSVC_KEY, JSON.stringify(favServices));
   localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
   renderFavorites();
-  cloudPut(); // 統合結果をクラウドへ反映
+  cloudPut();      // 統合結果をクラウドへ反映
+  loadSchedules(); // 通知スケジュールもクラウドから取得
 }
 // クラウド優先の和集合（クラウドの順を保ち、この端末だけの分を後ろに足す）
 function mergeBy(cloudArr, localArr, keyOf) {
@@ -473,8 +477,10 @@ function logout() {
   // 次回ログイン時に syncOnLogin がクラウドから取り直してキャッシュし直す。
   favorites = [];
   favServices = [];
+  schedules = [];
   localStorage.removeItem(FAV_KEY);
   localStorage.removeItem(FAVSVC_KEY);
+  localStorage.removeItem(SCHED_KEY);
   renderFavorites();
   renderAuthArea();
 }
@@ -506,31 +512,37 @@ function urlB64ToUint8(b64) {
   return out;
 }
 
-// 通知を許可→購読→サーバー登録→テスト送信、を一気にやる
-async function enableNotificationsAndTest() {
-  if (!authToken) { alert('先にGoogleでログインしてや'); return; }
+// 通知を許可→購読→サーバー登録（この端末を通知の宛先にする）。成功でtrue
+async function ensurePushSubscribed() {
+  if (!authToken) { alert('先にGoogleでログインしてや'); return false; }
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    alert('この端末は通知に対応してへんわ'); return;
+    alert('この端末は通知に対応してへんわ'); return false;
   }
-  if (!vapidPublicKey) { alert('通知の準備中や（少し待ってもう一回）'); return; }
+  if (!vapidPublicKey) { alert('通知の準備中や（少し待ってもう一回）'); return false; }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { alert('通知が許可されてへん。端末の設定で許可してや'); return false; }
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlB64ToUint8(vapidPublicKey),
+    });
+  }
+  await fetch('/api/push/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+    body: JSON.stringify({ subscription: sub }),
+  });
+  return true;
+}
+
+// テスト通知（購読を確かめてから本文付きテストを送る）
+async function enableNotificationsAndTest() {
   const btn = $('#notifyTest');
   btn.disabled = true;
   try {
-    const perm = await Notification.requestPermission();
-    if (perm !== 'granted') { alert('通知が許可されてへん。端末の設定で許可してや'); return; }
-    const reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlB64ToUint8(vapidPublicKey),
-      });
-    }
-    await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
-      body: JSON.stringify({ subscription: sub }),
-    });
+    if (!(await ensurePushSubscribed())) return;
     const r = await fetch('/api/push/test', {
       method: 'POST', headers: { Authorization: 'Bearer ' + authToken },
     });
@@ -542,6 +554,108 @@ async function enableNotificationsAndTest() {
   } finally {
     btn.disabled = false;
   }
+}
+
+// ───────────── 到着通知のスケジュール（曜日×時刻）─────────────
+const SCHED_KEY = 'sgbus.schedules';
+let schedules = JSON.parse(localStorage.getItem(SCHED_KEY) || '[]');
+const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']; // 0=日〜6=土
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // 表示は月→日
+
+function saveSchedules() {
+  localStorage.setItem(SCHED_KEY, JSON.stringify(schedules));
+  if (!authToken) return;
+  fetch('/api/schedules', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+    body: JSON.stringify(schedules),
+  }).catch(() => {});
+}
+async function loadSchedules() {
+  if (!authToken) return;
+  try {
+    const r = await fetch('/api/schedules', { headers: { Authorization: 'Bearer ' + authToken } });
+    if (!r.ok) return;
+    schedules = await r.json();
+    localStorage.setItem(SCHED_KEY, JSON.stringify(schedules));
+    if (!$('#schedModal').classList.contains('hidden')) renderSchedules();
+  } catch { /* オフライン等 */ }
+}
+
+function openSchedModal() { renderSchedules(); $('#schedModal').classList.remove('hidden'); }
+function closeSchedModal() { $('#schedModal').classList.add('hidden'); }
+
+function renderSchedules() {
+  const notice = $('#schedNotice'), listEl = $('#schedList'), formEl = $('#schedForm');
+  if (!listEl) return;
+  if (!authToken) {
+    notice.innerHTML = '通知を使うには、右上から Googleログインしてや。';
+    listEl.innerHTML = ''; formEl.innerHTML = '';
+    return;
+  }
+  notice.innerHTML =
+    'この端末で通知を受け取るには一度 ' +
+    '<button id="schedEnable" class="sched-enable">通知を有効にする</button> を押してな。';
+
+  // 登録済みリスト
+  if (!schedules.length) {
+    listEl.innerHTML = '<div class="muted sched-empty">まだ通知設定は無いで。下で追加してや。</div>';
+  } else {
+    listEl.innerHTML = schedules.map((s) => {
+      const dl = DAY_ORDER.filter((d) => s.days.includes(d)).map((d) => DAY_LABELS[d]).join('');
+      return `<div class="sched-row">
+        <div><b>${esc(s.service)}番</b> @ ${esc(s.name || s.code)}
+          <div class="muted">${dl} ・ ${esc(s.time)}</div></div>
+        <button class="sched-del" data-id="${esc(s.id)}">削除</button>
+      </div>`;
+    }).join('');
+  }
+
+  // 追加フォーム（バス＋バス停はお気に入りの路線から選ぶ）
+  if (!favServices.length) {
+    formEl.innerHTML = '<div class="muted sched-empty">先に「お気に入り」でバス番号＋バス停を登録すると、ここで選べるで。</div>';
+  } else {
+    const opts = favServices.map((f) =>
+      `<option value="${esc(f.code)}|${esc(f.service)}">${esc(f.service)}番 @ ${esc(f.name || f.code)}</option>`
+    ).join('');
+    formEl.innerHTML = `
+      <div class="sched-form-h">＋ 新しい通知</div>
+      <select id="schedSvc" class="sched-input">${opts}</select>
+      <div class="sched-days">${DAY_ORDER.map((d) =>
+        `<button type="button" class="sched-day" data-d="${d}">${DAY_LABELS[d]}</button>`).join('')}</div>
+      <div class="sched-time-row">
+        <input type="time" id="schedTime" class="sched-input" value="08:00" />
+        <button id="schedAdd" class="sched-add">追加</button>
+      </div>`;
+  }
+
+  $('#schedEnable')?.addEventListener('click', async () => {
+    if (await ensurePushSubscribed()) alert('この端末で通知を受け取れるようにしたで！');
+  });
+  listEl.querySelectorAll('.sched-del').forEach((b) =>
+    b.addEventListener('click', () => deleteSchedule(b.dataset.id)));
+  formEl.querySelectorAll('.sched-day').forEach((b) =>
+    b.addEventListener('click', () => b.classList.toggle('on')));
+  $('#schedAdd')?.addEventListener('click', addScheduleFromForm);
+}
+
+function addScheduleFromForm() {
+  const sel = $('#schedSvc');
+  if (!sel || !sel.value) return;
+  const [code, service] = sel.value.split('|');
+  const fav = favServices.find((f) => f.code === code && f.service === service);
+  const days = [...$('#schedForm').querySelectorAll('.sched-day.on')].map((b) => Number(b.dataset.d));
+  const time = $('#schedTime').value;
+  if (!days.length) { alert('曜日を選んでや'); return; }
+  if (!/^\d{2}:\d{2}$/.test(time)) { alert('時刻を入れてや'); return; }
+  schedules.push({ id: 'sc' + Date.now(), code, service, name: fav?.name || '', road: fav?.road || '', days, time });
+  saveSchedules();
+  renderSchedules();
+}
+function deleteSchedule(id) {
+  schedules = schedules.filter((s) => s.id !== id);
+  saveSchedules();
+  renderSchedules();
 }
 
 // ── 並び替え（ドラッグ＆ドロップ：SortableJS）──

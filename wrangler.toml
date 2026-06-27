@@ -30,3 +30,7 @@ VAPID_SUBJECT = "mailto:kuwasuke@gmail.com"
 [[kv_namespaces]]
 binding = "FAV_KV"
 id = "bb2f2e40be604c9fb14dd5093d939b04"
+
+# 到着通知のスケジュールを毎分チェックする Cron
+[triggers]
+crons = ["* * * * *"]
