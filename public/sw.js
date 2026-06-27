@@ -1,7 +1,7 @@
 // シンプルなService Worker。
 // アプリの殻（HTML/CSS/JS）はキャッシュしてオフラインでも開けるようにする。
 // 到着時間などの /api/ はリアルタイムが命なので必ずネットから取る。
-const CACHE = 'sgbus-v25';
+const CACHE = 'sgbus-v26';
 const SHELL = [
   './',
   './index.html',
@@ -35,6 +35,8 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
+  // 別オリジン（Googleログイン/Leaflet/地図タイル等）はSWを通さず素通し
+  if (url.origin !== self.location.origin) return;
   // API はネット優先（キャッシュしない）
   if (url.pathname.startsWith('/api/')) return;
   // 画面遷移(HTML)はネット優先・失敗時だけキャッシュ。

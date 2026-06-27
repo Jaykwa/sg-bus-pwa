@@ -113,7 +113,13 @@ function send(res, { status, body, headers }) {
 // ───────────── API ルート ─────────────
 
 // 稼働状態は監視用に常に開けておく（濫用ガードの対象外）
-app.get('/api/status', (req, res) => send(res, handleStatus(USE_MOCK)));
+// ※お気に入りのクラウド同期(/api/favorites)は KV 前提なので本番(Workers)のみ。
+//   ローカルの server.js では Client ID だけ返す（同期は worker 側で動かす）。
+app.get('/api/status', (req, res) => {
+  const s = handleStatus(USE_MOCK);
+  s.body.googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+  send(res, s);
+});
 
 // ここから先のデータAPIは「自オリジンからの呼び出し」だけ許可（タダ乗り防止）
 app.use('/api', (req, res, next) => {

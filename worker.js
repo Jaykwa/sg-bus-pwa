@@ -25,6 +25,13 @@ import {
   handleStatus,
   isAllowedApiRequest,
 } from './lib/busapi.js';
+import { verifyGoogleToken } from './lib/googleAuth.js';
+
+// Authorization: Bearer <token> から ID トークンを取り出す
+function bearer(request) {
+  const h = request.headers.get('authorization') || '';
+  return h.startsWith('Bearer ') ? h.slice(7) : '';
+}
 
 // JSONを返す小さいヘルパ
 function json(data, { status = 200, headers = {} } = {}) {
@@ -56,8 +63,11 @@ export default {
       }
 
       // 稼働状態は監視用に常に開けておく（濫用ガードの対象外）
+      // フロントが Google ログインを初期化できるよう Client ID も返す（公開情報）
       if (path === '/api/status') {
-        return reply(handleStatus(useMock));
+        const s = handleStatus(useMock);
+        s.body.googleClientId = env.GOOGLE_CLIENT_ID || '';
+        return reply(s);
       }
 
       // ここから先のデータAPIは「自オリジンからの呼び出し」だけ許可（タダ乗り防止）
@@ -78,6 +88,28 @@ export default {
       }
       if (path.startsWith('/api/stop/')) {
         return reply(handleStop(path.slice('/api/stop/'.length), stops));
+      }
+
+      // お気に入りのクラウド保存／取得（要 Googleログイン）
+      if (path === '/api/favorites') {
+        const user = await verifyGoogleToken(bearer(request), env.GOOGLE_CLIENT_ID);
+        if (!user) return json({ error: 'ログインが必要やで' }, { status: 401 });
+        const key = 'fav:' + user.sub;
+        if (request.method === 'GET') {
+          const data = await env.FAV_KV.get(key);
+          return json(data ? JSON.parse(data) : { favorites: [], favServices: [] });
+        }
+        if (request.method === 'PUT' || request.method === 'POST') {
+          const body = await request.json().catch(() => null);
+          if (!body || typeof body !== 'object') return json({ error: 'bad body' }, { status: 400 });
+          const clean = {
+            favorites: Array.isArray(body.favorites) ? body.favorites.slice(0, 500) : [],
+            favServices: Array.isArray(body.favServices) ? body.favServices.slice(0, 500) : [],
+          };
+          await env.FAV_KV.put(key, JSON.stringify(clean));
+          return json({ ok: true });
+        }
+        return json({ error: 'method' }, { status: 405 });
       }
 
       // /api/* 以外がここに来ることは基本ない（静的アセットが先に処理される）

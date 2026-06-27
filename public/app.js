@@ -55,6 +55,8 @@ init();
 async function init() {
   const st = await api('/api/status').catch(() => ({ mock: true }));
   $('#modeBadge').textContent = st.mock ? 'モックデータ' : 'ライブ';
+  renderAuthArea();                  // 保存済みのログイン状態を即反映
+  initGoogleAuth(st.googleClientId); // Googleログインを初期化（Client IDがあれば）
 
   $('#searchInput').addEventListener('input', debounce(onSearch, 300));
   $('#nearbyBtn').addEventListener('click', onNearby);
@@ -333,7 +335,7 @@ function toggleCurrentFav() {
   if (!s) return;
   if (isFav(s.code)) favorites = favorites.filter((f) => f.code !== s.code);
   else favorites.push({ code: s.code, name: s.name, road: s.road });
-  localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
+  saveFavorites();
   $('#mFav').textContent = isFav(s.code) ? '★' : '☆';
   renderFavorites();
 }
@@ -349,8 +351,139 @@ function toggleFavSvc(stop, service) {
   } else {
     favServices.push({ code: stop.code, name: stop.name, road: stop.road, service });
   }
-  localStorage.setItem(FAVSVC_KEY, JSON.stringify(favServices));
+  saveFavServices();
   renderFavorites();
+}
+
+// ───────────── Googleログイン & お気に入りのクラウド同期 ─────────────
+// ログインすると、お気に入りが Cloudflare KV にユーザー毎に保存される。
+// 別端末でも同じGoogleアカウントでログインすれば、お気に入りが引き継がれる。
+// 未ログインのときは今まで通り端末内(localStorage)だけに保存される。
+let authToken = localStorage.getItem('sgbus.idtoken') || '';
+let authUser = JSON.parse(localStorage.getItem('sgbus.user') || 'null');
+let cloudSyncTimer = null;
+
+// お気に入り保存：端末内へ保存し、ログイン中ならクラウドへもまとめて送る
+function saveFavorites() {
+  localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
+  scheduleCloudSync();
+}
+function saveFavServices() {
+  localStorage.setItem(FAVSVC_KEY, JSON.stringify(favServices));
+  scheduleCloudSync();
+}
+function scheduleCloudSync() {
+  if (!authToken) return;                 // 未ログインなら端末内だけ
+  clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = setTimeout(cloudPut, 1200); // 連続変更はまとめて送る
+}
+
+async function cloudPut() {
+  if (!authToken) return;
+  try {
+    const r = await fetch('/api/favorites', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+      body: JSON.stringify({ favorites, favServices }),
+    });
+    if (r.status === 401) refreshAuth();   // トークン切れ→取り直し
+  } catch { /* オフライン等は次の変更で再送される */ }
+}
+async function cloudGet() {
+  try {
+    const r = await fetch('/api/favorites', { headers: { Authorization: 'Bearer ' + authToken } });
+    if (r.status === 401) { refreshAuth(); return null; }
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+// ログイン直後：クラウドとローカルを統合（どちらの登録も失わない）→ 統合結果を保存
+async function syncOnLogin() {
+  if (!authToken) return;
+  const cloud = await cloudGet();
+  if (!cloud) return;
+  favServices = mergeBy(cloud.favServices || [], favServices, (f) => f.code + '|' + f.service);
+  favorites   = mergeBy(cloud.favorites   || [], favorites,   (s) => s.code);
+  localStorage.setItem(FAVSVC_KEY, JSON.stringify(favServices));
+  localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
+  renderFavorites();
+  cloudPut(); // 統合結果をクラウドへ反映
+}
+// クラウド優先の和集合（クラウドの順を保ち、この端末だけの分を後ろに足す）
+function mergeBy(cloudArr, localArr, keyOf) {
+  const seen = new Set();
+  const out = [];
+  for (const x of [...cloudArr, ...localArr]) {
+    const k = keyOf(x);
+    if (seen.has(k)) continue;
+    seen.add(k); out.push(x);
+  }
+  return out;
+}
+
+// ── Google Identity Services ──
+function initGoogleAuth(clientId) {
+  if (!clientId) return; // Client ID 未設定ならログイン機能は出さへん
+  whenGoogleReady(() => {
+    google.accounts.id.initialize({
+      client_id: clientId,
+      callback: onGoogleCredential,
+      auto_select: true, // 一度ログインしたら次回以降は自動でトークンを取り直す
+    });
+    google.accounts.id.renderButton($('#gSignin'), {
+      type: 'standard', theme: 'filled_white', size: 'medium', text: 'signin', shape: 'pill',
+    });
+    renderAuthArea();
+    if (authToken) syncOnLogin(); // 既ログインなら保存済みトークンで即同期（切れてたら取り直す）
+  });
+}
+function whenGoogleReady(cb) {
+  if (window.google && google.accounts && google.accounts.id) return cb();
+  let n = 0;
+  const t = setInterval(() => {
+    if (window.google && google.accounts && google.accounts.id) { clearInterval(t); cb(); }
+    else if (++n > 80) clearInterval(t); // 8秒であきらめ
+  }, 100);
+}
+// Googleからトークンが届いた（ログイン成功）
+function onGoogleCredential(resp) {
+  authToken = resp.credential; // GoogleのIDトークン(JWT)。検証はサーバー側でやる
+  try {
+    const p = JSON.parse(atob(resp.credential.split('.')[1])); // 表示用に中身だけ読む
+    authUser = { email: p.email, name: p.name, sub: p.sub };
+  } catch { authUser = { email: '' }; }
+  localStorage.setItem('sgbus.idtoken', authToken);
+  localStorage.setItem('sgbus.user', JSON.stringify(authUser));
+  renderAuthArea();
+  syncOnLogin();
+}
+function refreshAuth() {
+  // トークン切れ等。One Tap で静かに取り直しを試みる
+  if (window.google && google.accounts && google.accounts.id) google.accounts.id.prompt();
+}
+function logout() {
+  authToken = ''; authUser = null;
+  localStorage.removeItem('sgbus.idtoken');
+  localStorage.removeItem('sgbus.user');
+  if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect();
+  renderAuthArea();
+  // 端末内のお気に入りはそのまま残す（消さへん）
+}
+function renderAuthArea() {
+  const signin = $('#gSignin'), userBox = $('#gUser');
+  if (!signin || !userBox) return;
+  if (authUser) {
+    signin.style.display = 'none';
+    userBox.style.display = 'flex';
+    userBox.innerHTML =
+      `<span class="g-email" title="${esc(authUser.email || '')}">${esc(authUser.email || 'ログイン中')}</span>` +
+      `<button id="gLogout" class="g-logout">ログアウト</button>`;
+    $('#gLogout').addEventListener('click', logout);
+  } else {
+    userBox.style.display = 'none';
+    signin.style.display = 'block';
+  }
 }
 
 // ── 並び替え（ドラッグ＆ドロップ：SortableJS）──
@@ -472,7 +605,7 @@ function renderFavorites() {
       card.querySelector('.fav-svc-lines').addEventListener('click', open);
       sec.appendChild(wrapSwipe(card, g.code, () => {
         favServices = favServices.filter((f) => f.code !== g.code); // この停留所の番号を全部削除
-        localStorage.setItem(FAVSVC_KEY, JSON.stringify(favServices));
+        saveFavServices();
         renderFavorites();
       }));
     }
@@ -483,7 +616,7 @@ function renderFavorites() {
       const groups = {};
       for (const f of favServices) (groups[f.code] ??= []).push(f);
       favServices = order.flatMap((c) => groups[c] || []);
-      localStorage.setItem(FAVSVC_KEY, JSON.stringify(favServices));
+      saveFavServices();
     });
   }
 
@@ -505,7 +638,7 @@ function renderFavorites() {
       card.querySelector('.fav-stop-text').addEventListener('click', () => { if (!suppressOpen) openStop(s); });
       sec.appendChild(wrapSwipe(card, s.code, () => {
         favorites = favorites.filter((f) => f.code !== s.code);
-        localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
+        saveFavorites();
         renderFavorites();
       }));
     });
@@ -514,7 +647,7 @@ function renderFavorites() {
     makeSortable(sec, (order) => {
       const byCode = Object.fromEntries(favorites.map((s) => [s.code, s]));
       favorites = order.map((c) => byCode[c]).filter(Boolean);
-      localStorage.setItem(FAV_KEY, JSON.stringify(favorites));
+      saveFavorites();
     });
   }
 }

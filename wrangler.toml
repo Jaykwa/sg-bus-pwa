@@ -18,3 +18,12 @@ binding = "ASSETS"
 # (/index.html)がコケる。"none" でリダイレクトを止め、/index.html を素直に200で返す。
 # 代わりにトップ "/" は worker.js が index.html を返す。
 html_handling = "none"
+
+# Google ログイン用の Client ID（公開情報。Google Cloud Console で発行して貼る）
+[vars]
+GOOGLE_CLIENT_ID = ""
+
+# お気に入りをユーザー毎に保存する KV
+[[kv_namespaces]]
+binding = "FAV_KV"
+id = "bb2f2e40be604c9fb14dd5093d939b04"

@@ -10,11 +10,17 @@
   <!-- Leaflet（無料地図） -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="styles.css" />
+  <!-- Google ログイン -->
+  <script src="https://accounts.google.com/gsi/client" async></script>
 </head>
 <body>
   <header class="topbar">
     <h1>🚌 SG Bus</h1>
     <span id="modeBadge" class="badge"></span>
+    <div id="authArea" class="auth-area">
+      <div id="gSignin"></div>
+      <div id="gUser" class="g-user" style="display:none"></div>
+    </div>
   </header>
 
   <main>
