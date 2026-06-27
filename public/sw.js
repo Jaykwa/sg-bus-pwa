@@ -1,7 +1,7 @@
 // シンプルなService Worker。
 // アプリの殻（HTML/CSS/JS）はキャッシュしてオフラインでも開けるようにする。
 // 到着時間などの /api/ はリアルタイムが命なので必ずネットから取る。
-const CACHE = 'sgbus-v28';
+const CACHE = 'sgbus-v29';
 const SHELL = [
   './',
   './index.html',
@@ -39,18 +39,17 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== self.location.origin) return;
   // API はネット優先（キャッシュしない）
   if (url.pathname.startsWith('/api/')) return;
-  // 画面遷移(HTML)はネット優先・失敗時だけキャッシュ。
-  // ＝古い殻やリダイレクトでアプリが固まるのを防ぐ。
-  if (e.request.mode === 'navigate') {
-    e.respondWith(
-      fetch(e.request).catch(() =>
-        caches.match(e.request).then((h) => h || caches.match('./index.html'))
-      )
-    );
-    return;
-  }
-  // CSS/JS/画像はキャッシュ優先
-  e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request)));
+  // 殻(HTML/CSS/JS/画像)はネット優先。取れたらキャッシュ更新、ダメな時だけキャッシュ。
+  // ＝コード更新が次回読み込みで即反映される（古いJSが残って機能が効かへんのを防ぐ）。
+  e.respondWith(
+    fetch(e.request)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(e.request).then((h) => h || caches.match('./index.html')))
+  );
 });
 
 // ── プッシュ通知 ──

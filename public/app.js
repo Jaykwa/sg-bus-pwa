@@ -75,7 +75,7 @@ async function init() {
     await refreshFavServiceEtas();
     setTimeout(() => ic.classList.remove('spinning'), 400);
   });
-  $('#notifyTest').addEventListener('click', enableNotificationsAndTest); // 通知テスト
+  $('#notifyTest')?.addEventListener('click', enableNotificationsAndTest); // 通知テスト
   $('#mRefresh').addEventListener('click', async () => {  // 手動更新
     if (!currentModalStop) return;
     const btn = $('#mRefresh');

@@ -52,12 +52,13 @@
 
     <!-- お気に入り（起動時に最初に表示するタブ） -->
     <section id="view-fav" class="view active">
+      <div class="notify-bar">
+        <span class="notify-label">🔔 到着通知</span>
+        <button id="notifyTest" title="通知をテスト送信">通知テスト</button>
+      </div>
       <div id="favToolbar" class="fav-toolbar">
         <span class="fav-tip">右にスワイプで削除 →</span>
-        <div class="fav-tools">
-          <button id="notifyTest" title="通知をテスト送信">🔔 通知テスト</button>
-          <button id="favRefresh" title="全体を更新"><span class="ref-ic">↻</span> 更新</button>
-        </div>
+        <button id="favRefresh" title="全体を更新"><span class="ref-ic">↻</span> 更新</button>
       </div>
       <p id="favHint" class="hint">お気に入りはまだ無いで。<br>到着画面で各バスの ☆ を押すと「この停留所のこの番号」だけ登録できるで</p>
       <div id="favList"></div>
