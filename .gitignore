@@ -15,3 +15,6 @@ android-build/
 android.keystore
 .bubblewrap/
 twa-manifest.json.bak
+
+# Web Push 秘密鍵（ローカルのみ）
+.vapid-private

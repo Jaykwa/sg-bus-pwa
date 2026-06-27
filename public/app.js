@@ -55,6 +55,7 @@ init();
 async function init() {
   const st = await api('/api/status').catch(() => ({ mock: true }));
   $('#modeBadge').textContent = st.mock ? 'モックデータ' : 'ライブ';
+  vapidPublicKey = st.vapidPublicKey || ''; // 通知の購読に使う公開鍵
   renderAuthArea();                  // 保存済みのログイン状態を即反映
   initGoogleAuth(st.googleClientId); // Googleログインを初期化（Client IDがあれば）
 
@@ -74,6 +75,7 @@ async function init() {
     await refreshFavServiceEtas();
     setTimeout(() => ic.classList.remove('spinning'), 400);
   });
+  $('#notifyTest').addEventListener('click', enableNotificationsAndTest); // 通知テスト
   $('#mRefresh').addEventListener('click', async () => {  // 手動更新
     if (!currentModalStop) return;
     const btn = $('#mRefresh');
@@ -489,6 +491,56 @@ function renderAuthArea() {
   } else {
     userBox.style.display = 'none';
     signin.style.display = 'block';
+  }
+}
+
+// ───────────── プッシュ通知（フェーズ1：購読＋テスト送信）─────────────
+let vapidPublicKey = ''; // /api/status から受け取る公開鍵
+
+function urlB64ToUint8(b64) {
+  const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+  const base64 = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+// 通知を許可→購読→サーバー登録→テスト送信、を一気にやる
+async function enableNotificationsAndTest() {
+  if (!authToken) { alert('先にGoogleでログインしてや'); return; }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert('この端末は通知に対応してへんわ'); return;
+  }
+  if (!vapidPublicKey) { alert('通知の準備中や（少し待ってもう一回）'); return; }
+  const btn = $('#notifyTest');
+  btn.disabled = true;
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { alert('通知が許可されてへん。端末の設定で許可してや'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8(vapidPublicKey),
+      });
+    }
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+      body: JSON.stringify({ subscription: sub }),
+    });
+    const r = await fetch('/api/push/test', {
+      method: 'POST', headers: { Authorization: 'Bearer ' + authToken },
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.sent > 0) alert('テスト通知を送ったで！数秒で届くはず📩');
+    else alert('送信に失敗：' + (j.error || ('HTTP ' + r.status)));
+  } catch (e) {
+    alert('通知の設定でエラー：' + e);
+  } finally {
+    btn.disabled = false;
   }
 }
 

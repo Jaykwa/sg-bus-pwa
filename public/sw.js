@@ -1,7 +1,7 @@
 // シンプルなService Worker。
 // アプリの殻（HTML/CSS/JS）はキャッシュしてオフラインでも開けるようにする。
 // 到着時間などの /api/ はリアルタイムが命なので必ずネットから取る。
-const CACHE = 'sgbus-v27';
+const CACHE = 'sgbus-v28';
 const SHELL = [
   './',
   './index.html',
@@ -51,4 +51,31 @@ self.addEventListener('fetch', (e) => {
   }
   // CSS/JS/画像はキャッシュ優先
   e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request)));
+});
+
+// ── プッシュ通知 ──
+// ペイロードがあればそれを表示。無ければテスト通知（フェーズ1）。
+self.addEventListener('push', (e) => {
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch { data = {}; }
+  const title = data.title || '🚌 SG Bus 通知テスト';
+  const opts = {
+    body: data.body || '通知が届いたで！設定はうまくいっとる。',
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    tag: data.tag || 'sgbus',
+    data: { url: data.url || './index.html' },
+  };
+  e.waitUntil(self.registration.showNotification(title, opts));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data && e.notification.data.url) || './index.html';
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      for (const w of wins) { if ('focus' in w) return w.focus(); }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
+  );
 });

@@ -22,6 +22,9 @@ html_handling = "none"
 # Google ログイン用の Client ID（公開情報。Google Cloud Console で発行して貼る）
 [vars]
 GOOGLE_CLIENT_ID = "376496389074-ffcqnp5cvjtta7s5okuvh9gujeib3odb.apps.googleusercontent.com"
+# Web Push（通知）。公開鍵は公開情報。秘密鍵は `wrangler secret put VAPID_PRIVATE_KEY`。
+VAPID_PUBLIC_KEY = "BD20EHkQdPXY-hdZrly6KWqKdAEKdLFOlk-cKvyMsn4HLwcO6OStKoXvjo0FwWE0XJ1FIwJZQhhkTkRly9Vn3MA"
+VAPID_SUBJECT = "mailto:kuwasuke@gmail.com"
 
 # お気に入りをユーザー毎に保存する KV
 [[kv_namespaces]]

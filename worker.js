@@ -26,6 +26,7 @@ import {
   isAllowedApiRequest,
 } from './lib/busapi.js';
 import { verifyGoogleToken } from './lib/googleAuth.js';
+import { sendPushEmpty } from './lib/webpush.js';
 
 // Authorization: Bearer <token> から ID トークンを取り出す
 function bearer(request) {
@@ -67,6 +68,7 @@ export default {
       if (path === '/api/status') {
         const s = handleStatus(useMock);
         s.body.googleClientId = env.GOOGLE_CLIENT_ID || '';
+        s.body.vapidPublicKey = env.VAPID_PUBLIC_KEY || ''; // フロントの購読に使う（公開鍵）
         return reply(s);
       }
 
@@ -110,6 +112,40 @@ export default {
           return json({ ok: true });
         }
         return json({ error: 'method' }, { status: 405 });
+      }
+
+      // プッシュ通知の購読登録／解除（要 Googleログイン）。購読は push:<sub> に配列で保存
+      if (path === '/api/push/subscribe' || path === '/api/push/unsubscribe') {
+        const user = await verifyGoogleToken(bearer(request), env.GOOGLE_CLIENT_ID);
+        if (!user) return json({ error: 'ログインが必要やで' }, { status: 401 });
+        const body = await request.json().catch(() => null);
+        const sub = body && body.subscription;
+        if (!sub || !sub.endpoint) return json({ error: 'bad subscription' }, { status: 400 });
+        const key = 'push:' + user.sub;
+        let list = JSON.parse((await env.FAV_KV.get(key)) || '[]');
+        list = list.filter((s) => s.endpoint !== sub.endpoint); // 同一端末は重複させない
+        if (path === '/api/push/subscribe') list.push(sub);
+        await env.FAV_KV.put(key, JSON.stringify(list.slice(0, 20)));
+        return json({ ok: true, count: list.length });
+      }
+
+      // テスト通知を自分の端末へ送る（要 Googleログイン）
+      if (path === '/api/push/test') {
+        const user = await verifyGoogleToken(bearer(request), env.GOOGLE_CLIENT_ID);
+        if (!user) return json({ error: 'ログインが必要やで' }, { status: 401 });
+        const key = 'push:' + user.sub;
+        const list = JSON.parse((await env.FAV_KV.get(key)) || '[]');
+        if (!list.length) return json({ error: '通知の購読がまだ無いで', sent: 0 }, { status: 400 });
+        let sent = 0;
+        const alive = [];
+        for (const sub of list) {
+          const st = await sendPushEmpty(sub, env).catch(() => 0);
+          if (st === 404 || st === 410) continue;       // 無効な購読は捨てる
+          alive.push(sub);
+          if (st >= 200 && st < 300) sent++;
+        }
+        await env.FAV_KV.put(key, JSON.stringify(alive));
+        return json({ ok: true, sent });
       }
 
       // /api/* 以外がここに来ることは基本ない（静的アセットが先に処理される）
