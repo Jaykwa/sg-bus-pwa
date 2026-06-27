@@ -170,7 +170,17 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
 }
 .fav-svc-line + .fav-svc-line { border-top: 1px dashed var(--line); }
 .fav-svc-line .right { font-size: 13px; }
-.fav-svc-line .right .min { font-weight: 800; margin-left: 6px; }
+.fav-svc-line .right .eta-item { white-space: nowrap; }
+.fav-svc-line .right .min { font-weight: 800; }
 .fav-svc-line .right .min.lc-low  { color: var(--eta-far); }
 .fav-svc-line .right .min.lc-mid  { color: var(--eta-mid); }
 .fav-svc-line .right .min.lc-high { color: var(--eta-soon); }
+/* 到着時間の前に出す混雑度の丸（緑=空き/オレンジ=やや混/赤=満員/グレー=不明）*/
+.eta-dot {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  margin-right: 3px; vertical-align: middle;
+}
+.eta-dot.lc-low  { background: var(--eta-far); }
+.eta-dot.lc-mid  { background: var(--eta-mid); }
+.eta-dot.lc-high { background: var(--eta-soon); }
+.eta-dot.lc-na   { background: #ccc; }

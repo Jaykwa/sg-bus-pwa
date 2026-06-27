@@ -297,6 +297,11 @@ function loadColorClass(load) {
   return info ? 'lc-' + info.cls : '';
 }
 
+// 混雑度の丸印（🟢空き / 🟠やや混 / 🔴満員、不明はグレー）。お気に入りで時間の前に出す。
+function loadDot(load) {
+  return `<span class="eta-dot ${loadColorClass(load) || 'lc-na'}"></span>`;
+}
+
 // 車種・設備のアイコン列（♿と同サイズ）
 function vehicleIcons(b) {
   const out = [];
@@ -535,7 +540,7 @@ function refreshFavServiceEtas() {
           ? buses.slice(0, 3).map((b) => {
               const t = b.etaMin <= 0 ? '到着' : b.etaMin + '分';
               const cls = loadColorClass(b.load); // 混雑度で色分け（緑→オレンジ→赤）
-              return `<span class="min ${cls}">${t}</span>`;
+              return `<span class="eta-item">${loadDot(b.load)}<span class="min ${cls}">${t}</span></span>`;
             }).join(' ')
           : '<span class="muted">運行情報なし</span>';
         // バス番号バッジを「直近バスの混雑度」で色づけ（ひと目で混み具合がわかる）
