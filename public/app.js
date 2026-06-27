@@ -531,7 +531,7 @@ function refreshFavServiceEtas() {
         if (!cell) continue;
         const buses = svcMap[f.service] || [];
         cell.innerHTML = buses.length
-          ? buses.slice(0, 2).map((b) => {
+          ? buses.slice(0, 3).map((b) => {
               const t = b.etaMin <= 0 ? '到着' : b.etaMin + '分';
               const cls = loadColorClass(b.load); // 混雑度で色分け（緑→オレンジ→赤）
               return `<span class="min ${cls}">${t}</span>`;
