@@ -537,6 +537,9 @@ function refreshFavServiceEtas() {
               return `<span class="min ${cls}">${t}</span>`;
             }).join(' ')
           : '<span class="muted">運行情報なし</span>';
+        // バス番号バッジを「直近バスの混雑度」で色づけ（ひと目で混み具合がわかる）
+        const pill = cell.closest('.fav-svc-line')?.querySelector('.svc-pill');
+        if (pill) pill.className = 'svc-pill ' + (buses[0] ? loadColorClass(buses[0].load) : '');
       }
     }).catch(() => {})
   );
