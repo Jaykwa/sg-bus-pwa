@@ -21,7 +21,7 @@ html_handling = "none"
 
 # Google ログイン用の Client ID（公開情報。Google Cloud Console で発行して貼る）
 [vars]
-GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_ID = "376496389074-ffcqnp5cvjtta7s5okuvh9gujeib3odb.apps.googleusercontent.com"
 
 # お気に入りをユーザー毎に保存する KV
 [[kv_namespaces]]
