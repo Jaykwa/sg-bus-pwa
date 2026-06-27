@@ -73,6 +73,8 @@ main { max-width: 720px; margin: 0 auto; padding: 12px; }
   font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
 .locate-btn:active { background: var(--green); }
+/* 「この付近を表示」ボタンは現在地ボタンの真上（48px + 8px gap）*/
+.here-btn { bottom: 72px; }
 .map-go {
   margin-top: 8px; border: none; background: var(--green); color: #fff;
   border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer;

@@ -59,6 +59,7 @@ async function init() {
   $('#searchInput').addEventListener('input', debounce(onSearch, 300));
   $('#nearbyBtn').addEventListener('click', onNearby);
   $('#locateBtn').addEventListener('click', locateAndPlot); // 地図：現在地に戻る
+  $('#hereBtn').addEventListener('click', plotHere);         // 地図：今見てる場所の付近を表示
   document.querySelectorAll('.tabs button').forEach((b) =>
     b.addEventListener('click', () => switchTab(b.dataset.tab))
   );
@@ -586,6 +587,19 @@ function locateAndPlot() {
     () => {}, // 位置取れんかったらシンガポール全体のまま
     { enableHighAccuracy: true, timeout: 8000 }
   );
+}
+
+// 今表示している地図の中心付近のバス停をプロット（現在地ではなく「見てる場所」基準）
+async function plotHere() {
+  if (!map) return;
+  const btn = $('#hereBtn');
+  btn.disabled = true; // 二度押し防止（応答は速いので一瞬）
+  try {
+    const c = map.getCenter();
+    const stops = await api(`/api/nearby?lat=${c.lat}&lng=${c.lng}`);
+    plotStops(stops);
+  } catch { /* 取得失敗は黙ってスルー（既存ピンは残す）*/ }
+  btn.disabled = false;
 }
 
 function plotStops(stops) {

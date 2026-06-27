@@ -20,19 +20,19 @@
   <main>
     <!-- タブ -->
     <nav class="tabs">
-      <button data-tab="list" class="active">一覧</button>
+      <button data-tab="list">一覧</button>
       <button data-tab="map">地図</button>
-      <button data-tab="fav">★ お気に入り</button>
+      <button data-tab="fav" class="active">★ お気に入り</button>
     </nav>
 
-    <!-- 検索（一覧タブのときだけ表示。タブ行の下） -->
-    <section class="search">
+    <!-- 検索（一覧タブのときだけ表示。タブ行の下）。起動はお気に入りタブなので初期は隠す -->
+    <section class="search" style="display:none">
       <input id="searchInput" type="search" placeholder="バス停コード・名前・道路名で検索 (例: 09022, Orchard)" autocomplete="off" />
       <button id="nearbyBtn" title="現在地から近いバス停">📍 近く</button>
     </section>
 
     <!-- 一覧（検索結果 or お気に入りの到着情報） -->
-    <section id="view-list" class="view active">
+    <section id="view-list" class="view">
       <p id="listHint" class="hint">バス停を検索するか、📍近く を押してや</p>
       <div id="results"></div>
     </section>
@@ -40,11 +40,12 @@
     <!-- 地図 -->
     <section id="view-map" class="view">
       <div id="map"></div>
+      <button id="hereBtn" class="locate-btn here-btn" title="今表示している場所の付近のバス停を表示">🚏</button>
       <button id="locateBtn" class="locate-btn" title="現在地に戻る・近くを再取得">📍</button>
     </section>
 
-    <!-- お気に入り -->
-    <section id="view-fav" class="view">
+    <!-- お気に入り（起動時に最初に表示するタブ） -->
+    <section id="view-fav" class="view active">
       <div id="favToolbar" class="fav-toolbar">
         <span class="fav-tip">← 右にスワイプで削除</span>
         <button id="favRefresh" title="全体を更新"><span class="ref-ic">↻</span> 更新</button>
