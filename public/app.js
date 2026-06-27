@@ -467,8 +467,14 @@ function logout() {
   localStorage.removeItem('sgbus.idtoken');
   localStorage.removeItem('sgbus.user');
   if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect();
+  // お気に入りの端末キャッシュをクリア（クラウド側のデータは消さへん）。
+  // 次回ログイン時に syncOnLogin がクラウドから取り直してキャッシュし直す。
+  favorites = [];
+  favServices = [];
+  localStorage.removeItem(FAV_KEY);
+  localStorage.removeItem(FAVSVC_KEY);
+  renderFavorites();
   renderAuthArea();
-  // 端末内のお気に入りはそのまま残す（消さへん）
 }
 function renderAuthArea() {
   const signin = $('#gSignin'), userBox = $('#gUser');
